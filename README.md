@@ -4,6 +4,15 @@ A static HTML/CSS/JavaScript sample for returning customers and a solo home-serv
 
 **Live site:** [rikbanerjee.github.io/smbOS](https://rikbanerjee.github.io/smbOS/)
 
+## Sharing, readability, and calendar overview
+
+- One larger sticky company header shows the brand, tagline, Thursday hours, and contact control. Owners also have **Share** at the top right. Copy the public booking link or open the device's share options. The link opens the customer page even if that tab previously used owner mode, and carries no booking details.
+- Body text, controls, and helper text are larger, with darker text, stronger card boundaries, and fewer repeated header sections. The personal “Or, a little different this time?” heading remains.
+- Seasonal guidance sits above the returning-customer shortcut. October pricing still depends on the sample service date; choosing a later date recalculates the estimate.
+- Service selectors appear before their scope and conditional questions. New bookings no longer ask where to park; existing saved notes remain available to the owner.
+- The estimate stays on the booking page. On phones, tapping the footer total opens a price-breakdown sheet without losing the current step or answers.
+- **My day / Week / Month** provide detail and overview separately. Week/month buttons navigate periods; working-day tiles open the daily jobs and checklist. Week view combines estimated tools and materials for remaining confirmed work. Completed jobs stay in calendar history, cancelled jobs are omitted, and proposed holds are shown separately.
+
 ## Owner navigation on phones
 
 The owner workspace has four persistent destinations: **My day**, **Jobs & money**, **Requests**, and **My business**. My day shows the schedule, next stop, preparation, and decisions. My business contains **Services & prices**, repeat customers, and an explicit customer-page preview.
@@ -55,7 +64,7 @@ Tests cover conditional rule effects, immutable price/scope snapshots, quotes, a
 
 ## Hosting
 
-GitHub Pages source: **main / repository root**. Keep `index.html`, `styles.css`, `app.js`, `model.js`, `operations.js`, `experience.js`, `rules.js`, `workflow-model.js`, and `workflow-ui.js` together. `.nojekyll` disables Jekyll processing. Pushing to `main` publishes the static site through GitHub Pages.
+GitHub Pages source: **main / repository root**. Keep `index.html`, `styles.css`, `app.js`, `model.js`, `operations.js`, `experience.js`, `rules.js`, `workflow-model.js`, and `workflow-ui.js`, `calendar.js`, and `readability.css` together. `.nojekyll` disables Jekyll processing. Pushing to `main` publishes the static site through GitHub Pages.
 
 ## Demo limits
 

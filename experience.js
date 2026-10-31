@@ -1,5 +1,5 @@
-import { AREAS, BUFFER, SERVICES, DEMO_DATES, quote, money, time, duration, dateLabel } from './model.js?v=owner-simple-4';
-import { PROPERTIES, DEMO_CLOCK, propertyHistory, repeatDraft, dayPlan, readiness } from './operations.js?v=owner-simple-4';
+import { AREAS, BUFFER, SERVICES, DEMO_DATES, quote, money, time, duration, dateLabel } from './model.js?v=readable-5';
+import { PROPERTIES, DEMO_CLOCK, propertyHistory, repeatDraft, dayPlan, readiness } from './operations.js?v=readable-5';
 
 export function repeatExperience({ bookings, propertyId, icon, esc }) {
   const saved = PROPERTIES.find(p => p.id === propertyId) ?? PROPERTIES[0];
@@ -22,13 +22,13 @@ function packingRows(plan, date, packed, esc) {
   return { items, done: items.filter(item => packed[`${date}:${item.key}`]).length, html: items.map((item, i) => `<div class="checklist"><input type="checkbox" id="pack-${i}" data-pack="${esc(item.key)}"${packed[`${date}:${item.key}`] ? ' checked' : ''}><label for="pack-${i}">${esc(item.label)}${item.description ? `<small>${esc(item.description)}</small>` : ''}</label></div>`).join('') };
 }
 
-export function providerDay({ bookings, date, packed, blockedDates, icon, esc }) {
+export function providerDay({ bookings, date, packed, blockedDates, icon, esc, viewControls='' }) {
   const plan = dayPlan(bookings, date), next = plan.next, ready = next ? readiness(next) : null;
   const packing = packingRows(plan, date, packed, esc);
   const planned = plan.visits.filter(b => b.status === 'confirmed');
   const awaiting = bookings.filter(b => b.pendingChange?.status === 'awaiting_customer');
   return `<div class="intro-row"><div><div class="eyebrow">MY DAY · YOUR WORK AT A GLANCE</div><h1>My day</h1><p>Your next job, where to go, and what to bring.</p></div><select class="owner-date" aria-label="Joe’s work day" data-field="ownerDate">${DEMO_DATES.map(d => `<option value="${d}"${d === date ? ' selected' : ''}>${dateLabel(d)}</option>`).join('')}</select></div>
-    <div class="day-toolbar"><span class="tag">${icon('clock')}Sample day: ${time(DEMO_CLOCK)} · Eastern</span><button class="text-btn" data-action="load-working-day">${icon('plus')}Try a sample day</button><button class="text-btn weather-action" data-action="rain-plan"${!planned.length || planned.every(b => b.pendingChange) ? ' disabled' : ''}>${icon('rain')}Plan a rain delay</button></div>
+    ${viewControls}<div class="day-toolbar"><span class="tag">${icon('clock')}Sample day: ${time(DEMO_CLOCK)} · Eastern</span><button class="text-btn" data-action="load-working-day">${icon('plus')}Try a sample day</button><button class="text-btn weather-action" data-action="rain-plan"${!planned.length || planned.every(b => b.pendingChange) ? ' disabled' : ''}>${icon('rain')}Plan a rain delay</button></div>
     ${errorMarkup(blockedDates.includes(date) ? 'Rain day: new bookings are paused. Existing visits remain in the calendar until customers confirm changes.' : '', 'notice warning')}
     ${awaiting.length ? `<div class="notice warning">${icon('calendar')}<span><strong>${awaiting.length} weather change${awaiting.length === 1 ? '' : 's'} awaiting customer confirmation.</strong><br>Proposed slots are held; the original appointments remain confirmed.</span><button class="text-btn" data-action="bookings">Open customer demo ${icon('arrow')}</button></div>` : ''}
     <section class="next-job ${next && !ready.ready ? 'needs-attention' : ''}"><div class="next-copy"><div class="eyebrow">${next ? 'UP NEXT' : (plan.holds.length ? 'AWAITING CONFIRMATION' : 'ALL CLEAR')}</div><h2>${next ? esc(next.draft.name) : (plan.holds.length ? 'A plan is taking shape.' : 'No jobs booked for this day')}</h2><p>${next ? `${next.lines.map(l => l.name).join(' + ')}<br>${esc(next.draft.property)}` : (plan.holds.length ? 'Proposed visits below are reserved, awaiting each customer’s answer.' : 'Choose another day to view your work, or try the sample schedule.')}</p>

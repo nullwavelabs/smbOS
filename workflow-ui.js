@@ -1,6 +1,6 @@
-import {SERVICES,DEMO_DATES,defaultDraft,quote,money,duration,dateLabel,time,slots} from './model.js?v=owner-simple-4';
-import {DEFAULT_RULES,getRules,publishRules,visibleQuestions,validateRules} from './rules.js?v=owner-simple-4';
-import * as domain from './workflow-model.js?v=owner-simple-4';
+import {SERVICES,DEMO_DATES,defaultDraft,quote,money,duration,dateLabel,time,slots} from './model.js?v=readable-5';
+import {DEFAULT_RULES,getRules,publishRules,visibleQuestions,validateRules} from './rules.js?v=readable-5';
+import * as domain from './workflow-model.js?v=readable-5';
 export const WORK_STORE='business-hq-workflows-v3',RULE_STORE='business-hq-rules-v3';
 export function loadPublished(){try{const saved=localStorage.getItem(RULE_STORE);if(saved)publishRules(JSON.parse(saved));}catch{ /* Use the standard catalog when saved rules cannot be loaded. */ }}
 export function createWorkflows(ctx){
@@ -52,7 +52,7 @@ export function createWorkflows(ctx){
       return `<button class="nav-item ${active===v?'active':''}" data-action="wf-nav" data-id="${v}"${active===v?' aria-current="page"':''}>${icon(i)}<span>${label}</span>${count?`<span class="owner-request-count" aria-label="${count} new requests">${count}</span>`:''}</button>`;
     }).join('');
   }
-  function nav(view){return ['studio','plans'].includes(view)?'':`<div class="wf-owner-context"><span>${icon('bag')}OWNER VIEW</span><button class="text-btn" data-action="wf-customer-preview">View customer page ${icon('arrow')}</button></div>`;}
+  function nav(){return '';}
   function manage(){
     return head('YOUR BUSINESS SETTINGS','My business','Manage your services, prices, and repeat customers. Open My day to see your jobs.')+`<div class="wf-business-cards"><button class="panel wf-business-card" data-action="wf-nav" data-id="studio"><span class="wf-business-icon">${icon('tool')}</span><span><strong>Services & prices</strong><small>Change your prices, time estimates, and booking questions</small><em>${Object.keys(SERVICES).length} services ready to offer${studioDirty?' · Unsaved changes':''}</em></span>${icon('arrow')}</button><button class="panel wf-business-card" data-action="wf-nav" data-id="plans"><span class="wf-business-icon">${icon('repeat')}</span><span><strong>Repeat customers</strong><small>View repeat visits and seasonal reminders</small><em>${work.plans.filter(p=>p.status==='active').length} active plans · ${work.seasonal.filter(p=>p.active).length} seasonal reminders</em></span>${icon('arrow')}</button><button class="panel wf-business-card" data-action="wf-customer-preview"><span class="wf-business-icon">${icon('user')}</span><span><strong>See your customer page</strong><small>Check how customers choose and book your services</small><em>Opens the customer view of this demo</em></span>${icon('arrow')}</button></div><div class="wf-day-link"><div><strong>Ready for the day?</strong><p>Your jobs, directions, and packing list are in My day.</p></div>${button('Open My day','nav','owner')}</div>`;
   }

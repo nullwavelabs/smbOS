@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEMO_DATES, defaultDraft, quote, slots, validBooking } from '../model.js?v=owner-simple-4';
+import { DEMO_DATES, defaultDraft, quote, slots, validBooking } from '../model.js?v=readable-5';
 import { PROPERTIES, propertyHistory, repeatDraft, packingList, dayPlan, readiness, sampleDay, proposeRainPlan, approveRainPlan, respondToRainChange } from '../operations.js';
 
 test('repeat booking recalls the property and scope but recalculates current pricing', () => {
