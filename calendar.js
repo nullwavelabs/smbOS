@@ -1,5 +1,5 @@
-import {DEMO_DATES, dateLabel, time} from './model.js?v=readable-5';
-import {packingList} from './operations.js?v=readable-5';
+import {DEMO_DATES, dateLabel, time} from './model.js?v=field-day-8';
+import {packingList} from './operations.js?v=field-day-8';
 const utc=date=>new Date(date+'T12:00:00Z');
 const iso=date=>date.toISOString().slice(0,10);
 export function addDays(date,count){const d=utc(date);d.setUTCDate(d.getUTCDate()+count);return iso(d);}

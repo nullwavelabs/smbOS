@@ -1,11 +1,13 @@
-import {calendarControls,calendarOverview,shiftPeriod,weekDates} from './calendar.js?v=readable-5';
-import {DEFAULT_RULES,getRules} from './rules.js?v=readable-5';
-import {createWorkflows,loadPublished,WORK_STORE,RULE_STORE} from './workflow-ui.js?v=readable-5';
-import { SERVICES, AREAS, DEMO_DATES, BUFFER, money, duration, time, dateLabel, defaultDraft, quote, slots as modelSlots, validBooking as modelValidBooking } from './model.js?v=readable-5';
-import { PROPERTIES, propertyHistory, repeatDraft, packingList, sampleDay, proposeRainPlan, approveRainPlan, respondToRainChange, readiness } from './operations.js?v=readable-5';
-import { repeatExperience, providerDay, weatherReview, customerWeatherCard } from './experience.js?v=readable-5';
+import {createFieldDesk} from './owner-hq.js?v=field-day-8';
+import {calendarControls,calendarOverview,shiftPeriod,weekDates} from './calendar.js?v=field-day-8';
+import {DEFAULT_RULES,getRules} from './rules.js?v=field-day-8';
+import {createWorkflows,loadPublished,WORK_STORE,RULE_STORE} from './workflow-ui.js?v=field-day-8';
+import { SERVICES, AREAS, DEMO_DATES, BUFFER, money, duration, time, dateLabel, defaultDraft, quote, slots as modelSlots, validBooking as modelValidBooking } from './model.js?v=field-day-8';
+import { PROPERTIES, propertyHistory, repeatDraft, packingList, sampleDay, proposeRainPlan, approveRainPlan, respondToRainChange, readiness } from './operations.js?v=field-day-8';
+import { repeatExperience, providerDay, weatherReview, customerWeatherCard } from './experience.js?v=field-day-8';
 
 const paths = {
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4.5m0 3h.01"/>',
   share: '<path d="M12 16V3m-4 4 4-4 4 4M5 12v8h14v-8"/>',
   car: '<path d="m5 7 2-4h10l2 4m-16 4 2-4h14l2 4v7H3v-7Zm2 7v3m14-3v3M6 12h2m8 0h2"/>',
   rain: '<path d="M6 14a5 5 0 1 1 8-7 4 4 0 1 1 3 7M7 17l-2 4m8-4-2 4m8-4-2 4"/>',
@@ -41,10 +43,11 @@ let storageAvailable = true;
 let bookings = [];
 try { bookings = JSON.parse(localStorage.getItem(STORE) || '[]').filter(b => b && typeof b.id === 'string' && b.draft && Array.isArray(b.draft.services) && Number.isFinite(b.total) && Number.isFinite(b.block)); } catch { bookings = []; storageAvailable = false; }
 for(const b of bookings) { b.draft.catalogSnapshot ??= structuredClone(DEFAULT_RULES); if(b.pendingChange)b.pendingChange.draft.catalogSnapshot ??= structuredClone(DEFAULT_RULES); }
-const ownerViews=['owner','studio','quotes','jobs','plans','manage'];
-let entryView='home';try{if(new URLSearchParams(location.search).get('view')!=='customer'&&sessionStorage.getItem('business-hq-view-mode')==='owner')entryView='owner';}catch{}
+const ownerViews=['owner','studio','quotes','jobs','plans','manage','field-job','field-add','field-tasks','field-kit','field-customers'];
+let entryView='home';try{if(new URLSearchParams(location.search).get('view')==='owner'||new URLSearchParams(location.search).get('view')!=='customer'&&sessionStorage.getItem('business-hq-view-mode')==='owner')entryView='owner';}catch{}
 let view = entryView, stage = 0, draft = defaultDraft(), error = '', currentId = null, ownerDate = DEMO_DATES[0], dialog = null;
 let focusMain = false, calendarMode='day', headerObserver=null, dialogReturnId=null;
+try{const savedDay=sessionStorage.getItem('business-hq-workday');if(DEMO_DATES.includes(savedDay))ownerDate=savedDay;}catch{}
 let repeatPropertyId = PROPERTIES[0].id;
 let packed = {}, blockedDates = [];
 try { const saved = JSON.parse(localStorage.getItem('business-hq-operations-v2') || '{}'); packed = saved.packed && typeof saved.packed === 'object' ? saved.packed : {}; blockedDates = Array.isArray(saved.blockedDates) ? saved.blockedDates.filter(d => DEMO_DATES.includes(d)) : []; } catch { /* The demo still works without saved operational state. */ }
@@ -56,9 +59,11 @@ function startRepeat(edit = false) { const property = PROPERTIES.find(p => p.id 
 
 const app = document.querySelector('#app');
 const wf=createWorkflows({esc,icon,getBookings:()=>bookings,setBookings:value=>{bookings=value;},getDraft:()=>draft,blocked:()=>blockedDates,persistBookings:()=>persist(),render:()=>render(),navigate:next=>navigate(next),openDialog:d=>openDialog(d),closeDialog:()=>{dialog=null;},error:message=>{error=message;},clearError:()=>{error='';},announce:message=>announce(message),storageError:()=>{storageAvailable=false;},startDraft:(value,step)=>{draft=value;stage=step;currentId=null;navigate('book');}});
+const hq=createFieldDesk({esc,icon,bookings:()=>bookings,work:()=>wf.getWork(),date:()=>ownerDate,blocked:()=>blockedDates,packed:()=>packed,setPacked:value=>{packed=value;persistOperations();},setBookings:value=>{bookings=value;},setDate:value=>{ownerDate=value;},commit:result=>wf.commit(result),persist:()=>persist(),render:()=>render(),navigate:next=>navigate(next),schedule:()=>navigate('owner','week'),sample:()=>{const existing=bookings.find(b=>b.demoScenario&&b.status==='confirmed');if(existing)ownerDate=existing.draft.date;else{const visits=sampleDay(bookings,blockedDates);if(!visits.length){error='No complete sample day fits. Your existing bookings were preserved.';render();return;}bookings.push(...visits);ownerDate=visits[0].draft.date;persist();}navigate('owner');},rain:()=>{const plan=proposeRainPlan(bookings,ownerDate,blockedDates);openDialog({type:'rain',plan});},openDialog:d=>openDialog(d),closeDialog:()=>{dialog=null;},remind:id=>{wf.handle('wf-remind-payment',id);},error:message=>{error=message;},announce:message=>announce(message)});
+
 function announce(message) { document.querySelector('#announcement').textContent = message; }
 function persist() { wf.sync(); try { localStorage.setItem(STORE, JSON.stringify(bookings)); } catch { storageAvailable = false; } }
-function navigate(next) { if(next==='owner')calendarMode='day';const url=new URL(location.href);if(url.searchParams.has('view')){url.searchParams.delete('view');history.replaceState(null,'',url);}try{sessionStorage.setItem('business-hq-view-mode',ownerViews.includes(next)?'owner':'customer');}catch{} view = next; error = ''; dialog = null; focusMain = true; render(); }
+function navigate(next,mode='day') { if(next==='owner'){calendarMode=mode;if(mode==='day'&&!DEMO_DATES.includes(ownerDate))ownerDate=DEMO_DATES.find(d=>d.slice(0,7)===ownerDate.slice(0,7))||DEMO_DATES.find(d=>d>=ownerDate)||DEMO_DATES.at(-1);}const url=new URL(location.href);if(url.searchParams.has('view')){url.searchParams.delete('view');history.replaceState(null,'',url);}try{sessionStorage.setItem('business-hq-view-mode',ownerViews.includes(next)?'owner':'customer');}catch{} view = next; error = ''; dialog = null; focusMain = true; render(); }
 function startBooking(id = 'leaves', previous = null) {
   draft = previous ? { ...previous, catalogSnapshot:getRules(), extraWork:[], approvedOffer:undefined, services: [...previous.services], date: DEMO_DATES[0], start: null } : { ...defaultDraft(), services: [id] };
   draft.date = firstAvailableDate(); stage = 0; currentId = null; navigate('book');
@@ -68,13 +73,13 @@ function shell(content) {
   const brand = `<span class="brand-mark">${icon('leaf')}</span><span><strong>Joe’s Landscaping</strong><small>A little care. A better outdoors.</small></span>`;
   return `  <div class="shell ${active==='owner'?'owner-shell':'customer-shell'}"><aside class="sidebar"><a class="brand" href="#" data-action="${active==='owner'?'owner':'home'}">${brand}</a>
   <div><div class="nav-caption">${active==='owner'?'YOUR BUSINESS':'YOUR NEIGHBORHOOD, CARED FOR'}</div><nav class="nav-group" aria-label="${active==='owner'?'Owner navigation':'Customer navigation'}">
-  ${active==='owner'?wf.primaryNav(view):`  <button class="nav-item ${active === 'home' ? 'active' : ''}" ${active === 'home' ? 'aria-current="page"' : ''} data-action="home">${icon('grid')}<span>Book a service</span></button>
+  ${active==='owner'?hq.nav(view,calendarMode):`  <button class="nav-item ${active === 'home' ? 'active' : ''}" ${active === 'home' ? 'aria-current="page"' : ''} data-action="home">${icon('grid')}<span>Book a service</span></button>
   <button class="nav-item ${active === 'bookings' ? 'active' : ''}" ${active === 'bookings' ? 'aria-current="page"' : ''} data-action="bookings">${icon('calendar')}<span>My bookings</span>${bookings.filter(b => b.status !== 'cancelled').length ? `<span class="pill">${bookings.filter(b => b.status !== 'cancelled').length}</span>` : ''}</button>
   <button class="nav-item ${active === 'owner' ? 'active' : ''}" ${active === 'owner' ? 'aria-current="page"' : ''} data-action="owner">${icon('bag')}<span>Joe’s workspace</span><span class="pill">DEMO</span></button>
 `}
-  </nav></div><div class="sidebar-note">${icon('leaf')}<strong>${active==='owner'?'Your business, one day at a time.':'Good work. Less back-and-forth.'}</strong>${active==='owner'?'My day has your next job and preparation. My business holds your services and prices.':'Pick your services. Find a time. We’ll take care of the details.'}</div>
+  </nav></div><div class="sidebar-note">${icon('leaf')}<strong>${active==='owner'?'Your business, one day at a time.':'Good work. Less back-and-forth.'}</strong>${active==='owner'?'Your next job. What to bring. What needs you. Everything else is in My business.':'Pick your services. Find a time. We’ll take care of the details.'}</div>
   <div class="powered"><span class="bhq">B</span><span>A small business, powered by <b>Business HQ</b></span></div></aside>
-  <div class="workspace"><header class="topbar"><a class="brand header-brand" href="#" data-action="${active==='owner'?'owner':'home'}">${brand}<span class="booking-hours">Thursdays · 1–5 PM <b>${active==='owner'?'Owner demo':'Customer demo'}</b></span></a><div class="top-actions">${active==='owner'?`<button class="btn share-app" id="header-share-app" data-action="share-app" aria-label="Share your booking page">${icon('share')}<span>Share</span></button>`:''}<button class="icon-btn contact-action" aria-label="Joe’s contact details" data-action="contact">${icon('phone')}<span>Call</span></button></div></header>
+  <div class="workspace"><header class="topbar"><a class="brand header-brand" href="#" data-action="${active==='owner'?'owner':'home'}">${brand}<span class="booking-hours">Thursdays · 1–5 PM <b>${active==='owner'?'Owner demo':'Customer demo'}</b></span></a><div class="top-actions">${active==='owner'?`<button class="btn share-app" id="header-share-app" data-action="share-app" aria-label="Share your booking page">${icon('share')}<span>Share</span></button>`:''}${active==='owner'?`<button class="icon-btn contact-action" aria-label="Field desk help" data-action="hq-help">${icon('help')}<span>Help</span></button>`:`<button class="icon-btn contact-action" aria-label="Joe’s contact details" data-action="contact">${icon('phone')}<span>Call</span></button>`}</div></header>
   <main id="main" tabindex="-1">${content}<footer class="footer"><span>Joe’s Landscaping · East Providence, RI · Serving neighbors since 2015</span><span>Sample dates 2026–2027 · Saved on this device</span></footer></main></div></div>${dialog ? dialogContent() : ''}`;
 }
 function garden() { return `<div class="hero-art" aria-hidden="true"><svg viewBox="0 0 450 260" preserveAspectRatio="xMaxYMax slice"><circle cx="307" cy="83" r="49" fill="#a9bb79" opacity=".22"/><path d="M70 260c-5-103 47-95 84-70 31-76 111-48 122-10 51-90 126-67 174-31v111" fill="#4c7450"/><path d="M134 260c36-47 75-41 115-26 60-54 135-72 201-25v51" fill="#78925d"/><path d="M266 260c25-19 42-48 47-91l4-90 5 90c5 43 21 72 47 91" fill="#9b9766"/><path d="M318 195c-39-9-69-34-70-61 35-1 66 23 70 61m0-44c34-8 56-28 57-52-28 1-52 22-57 52m0-37c-29-5-50-22-53-42 25-3 46 15 53 42m1-33c25-5 42-21 43-39-22-2-39 14-43 39" fill="#c5d39b"/><path d="M208 260v-75m0 40c-30-1-45-18-46-37 25 1 41 14 46 37m0-21c29-2 44-19 43-37-25 4-40 16-43 37" stroke="#a7ba83" stroke-width="5" fill="#a7ba83"/><path d="M385 260v-54m0 26c-24-3-33-15-33-29 18 1 29 10 33 29m0-13c22-5 31-17 30-31-19 4-28 14-30 31" stroke="#c1ce98" stroke-width="4" fill="#c1ce98"/><ellipse cx="97" cy="222" rx="32" ry="12" fill="#7d975e"/><path d="M95 260v-40m-11 10 11 13 12-16" stroke="#bdc990" stroke-width="3" fill="none"/><circle cx="380" cy="49" r="3" fill="#c6d3a0"/><circle cx="194" cy="96" r="2" fill="#c6d3a0"/><path d="m181 57 4-7 4 7-4 7Z" fill="#c6d3a0"/></svg></div>`; }
@@ -150,20 +155,21 @@ function myBookings() {
   ${wf.quotes(false)}${bookings.length ? bookings.slice().sort((a,b) => (a.draft.date + a.draft.start).localeCompare(b.draft.date + b.draft.start)).map(b => `<article class="booking-card"><div class="booking-card-top"><div><div class="eyebrow">${esc(b.id)}</div><h3>${b.lines.map(l => esc(l.name)).join(' + ')}</h3></div><span class="tag ${b.status === 'cancelled' ? 'orange' : ''}">${icon(b.status === 'completed' ? 'check' : 'calendar')}${esc(b.status === 'confirmed' ? 'Confirmed' : b.status)}</span></div><div class="meta">${dateLabel(b.draft.date)} · ${time(b.draft.start)}–${time(b.draft.start + b.minutes)} · Eastern Time<br>${esc(b.draft.property)} · ${AREAS[b.draft.area]?.name} · <strong>${money(b.total)}</strong></div><div class="btn-row">${b.status === 'confirmed' && !b.pendingChange ? `<button class="btn small secondary" data-action="reschedule" data-id="${esc(b.id)}">${icon('calendar')}Reschedule</button><button class="text-btn" data-action="cancel" data-id="${esc(b.id)}">Cancel visit</button>` : ''}<button class="text-btn" data-action="rebook" data-id="${esc(b.id)}">${icon('repeat')}Book again</button><button class="text-btn" data-action="share-booking" data-id="${esc(b.id)}">${icon('link')}Demo link</button></div>${customerWeatherCard(b, icon, esc)}${b.status!=='cancelled'?wf.customerJob(b):''}${b.status === 'confirmed' && !b.draft.accessConfirmed ? `<div class="notice warning">${icon('pin')}<span>Joe needs to know how to access the work area.</span><button class="text-btn" data-action="customer-access" data-id="${esc(b.id)}">Confirm access</button></div>` : ''}</article>`).join('') : `<section class="panel empty">${icon('calendar')}<h2>A little care is on the horizon.</h2><p>You haven’t booked a demo visit yet.<br>Start with a fall cleanup or bring a booking link from another browser.</p><button class="btn" data-action="home">Find a service ${icon('arrow')}</button></section>`}
   ${wf.plans(false)}<section class="panel recovery" style="margin-top:24px"><div class="panel-title">${icon('link')}<h3>Have a demo booking link?</h3></div><p>Paste a link created by this prototype to restore the sample booking here. Real email verification and recovery need a backend.</p><div class="field" style="margin-top:14px"><label for="recover-link">Demo booking link</label><input id="recover-link" type="url" placeholder="Paste your demo booking link"></div>${error ? `<div class="error" role="alert">${esc(error)}</div>` : ''}<button class="text-btn" data-action="recover">Restore sample booking ${icon('arrow')}</button></section>`;
 }
-function owner() { if(calendarMode!=='day')return calendarOverview({bookings,date:ownerDate,mode:calendarMode,blockedDates,icon,esc});return `${error ? `<div class="error" role="alert">${esc(error)}</div>` : ""}${providerDay({ bookings, date: ownerDate, packed, blockedDates, icon, esc,viewControls:calendarControls(calendarMode) })}`; }
+function owner() {return `${error?`<div class="error" role="alert">${esc(error)}</div>`:''}${calendarMode!=='day'?calendarOverview({bookings,date:ownerDate,mode:calendarMode,blockedDates,icon,esc}):hq.today()}`;}
 
 function dialogContent() {
   let content = '';
   const b = bookings.find(b => b.id === dialog.id);
   if(dialog.type==='price-breakdown'){content=`<h2 id="dialog-title">Your visit price</h2><p>A clear breakdown of your current choices.</p>${bill(quote(draft),false)}`;
   }else if(dialog.type==='share-app'){const link=publicBookingLink();content=`<h2 id="dialog-title">Bring your customers with you.</h2><p>Share your booking page with a new customer or after a job. They can choose services and book without a phone call.</p><div class="field"><label for="business-share-link">Customer booking link</label><input id="business-share-link" value="${esc(link)}" readonly></div><div class="btn-row"><button class="btn" data-action="copy-business-link">${icon('link')}Copy booking link</button>${typeof navigator.share==='function'?`<button class="btn secondary" data-action="native-business-share">${icon('share')}More sharing options</button>`:''}</div><p id="business-share-status" role="status" class="share-status"></p><p class="share-note">This opens your public customer page. No booking details are included.</p>`;
+  }else if(dialog.type.startsWith('hq-')){content=hq.dialog(dialog);
   }else if(dialog.type.startsWith('wf-')) { content=wf.dialog(dialog);
   } else if (dialog.type === 'rain') {
     content = weatherReview({ plan: dialog.plan, bookings, icon, esc });
   } else if (dialog.type === 'route' && b) {
     const visits = bookings.filter(item => item.status !== 'cancelled' && item.draft.date === b.draft.date).sort((a,c) => a.draft.start - c.draft.start);
     const index = visits.findIndex(item => item.id === b.id), origin = index > 0 ? visits[index - 1].draft.property : 'Joe’s demo base · East Providence';
-    content = `<h2 id="dialog-title">Your next stop, clearly laid out.</h2><div class="route-stop"><small>FROM</small><strong>${esc(origin)}</strong></div><div class="route-leg">${icon('car')} ${BUFFER}-minute illustrative drive · leave at ${time(b.draft.start - BUFFER)}</div><div class="route-stop"><small>TO · ARRIVE ${time(b.draft.start)}</small><strong>${esc(b.draft.property)}</strong></div><div class="notice">${icon('pin')}<span><b>Access:</b> ${esc(b.draft.access || b.draft.notes || 'Needs confirmation')}<br><b>Parking:</b> ${esc(b.draft.parking || 'Not specified')}</span></div><p style="margin-top:16px">Fictional route preview. No live maps or traffic calculation are connected.</p>`;
+    content = `<h2 id="dialog-title">Your next stop, clearly laid out.</h2><div class="route-stop"><small>FROM</small><strong>${esc(origin)}</strong></div><div class="route-leg">${icon('car')} ${BUFFER}-minute illustrative drive · leave at ${time(b.draft.start - BUFFER)}</div><div class="route-stop"><small>TO · ARRIVE ${time(b.draft.start)}</small><strong>${esc(b.draft.property)}</strong></div><div class="notice">${icon('pin')}<span><b>Access:</b> ${esc(b.draft.access || b.draft.notes || 'Needs confirmation')}<br><b>Parking:</b> ${esc(b.draft.parking || 'Not specified')}</span></div><p style="margin-top:16px">Sample addresses and drive times. Opening Maps uses the address shown.</p><a class="btn secondary" target="_blank" rel="noopener noreferrer" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(b.draft.property+' '+(AREAS[b.draft.area]?.name||'East Providence')+', RI')}">Open address in Maps</a>`;
   } else if (dialog.type === 'access' && b) {
     content = `<h2 id="dialog-title">Customer demo: confirm access.</h2><p>Replying as ${esc(b.draft.name)}. This sample answer will appear in Joe’s job details. No real message is sent.</p><div class="field"><label for="access-answer">How can Joe get to the work area?</label><textarea id="access-answer" maxlength="300">${esc(b.draft.accessConfirmed ? b.draft.access : 'The rear gate will be unlocked. Park by the front path; please latch the gate afterward.')}</textarea></div><button class="btn full" style="margin-top:18px" data-action="save-access" data-id="${esc(b.id)}">Save customer demo answer</button>`;
   } else if (dialog.type === 'complete' && b) {
@@ -182,8 +188,8 @@ function dialogContent() {
   return `<div class="dialog-backdrop ${dialog.type==='price-breakdown'?'price-sheet':''}"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="dialog-head"><span class="eyebrow">JOE’S LANDSCAPING</span><button class="icon-btn" data-action="close-dialog" aria-label="Close dialog">${icon('close')}</button></div>${content}${error && dialog.type !== 'reschedule' ? `<div class="error" role="alert">${esc(error)}</div>` : ''}</section></div>`;
 }
 function render() {
-  const focused = document.activeElement?.id;headerObserver?.disconnect();
-  app.innerHTML = shell(`${ownerViews.includes(view)?wf.nav(view):''}${error&&!dialog&&['studio','quotes','jobs','plans','manage','bookings'].includes(view)?`<div class="error" role="alert">${esc(error)}</div>`:''}`+(view === 'home' ? home() : view === 'repeat' ? repeatExperience({ bookings, propertyId: repeatPropertyId, icon, esc }) : view === 'book' ? booking() : view === 'confirmation' ? confirmation() : view === 'owner' ? owner() : ['studio','quotes','jobs','plans','manage'].includes(view)?wf.render(view):myBookings()));
+  const focused = document.activeElement?.id;headerObserver?.disconnect();if(ownerViews.includes(view)&&DEMO_DATES.includes(ownerDate))try{sessionStorage.setItem('business-hq-workday',ownerDate);}catch{}
+  app.innerHTML = shell(`${ownerViews.includes(view)?wf.nav(view):''}${error&&!dialog&&['studio','quotes','jobs','plans','manage','bookings','field-job','field-add','field-tasks','field-kit','field-customers'].includes(view)?`<div class="error" role="alert">${esc(error)}</div>`:''}`+(view === 'home' ? home() : view === 'repeat' ? repeatExperience({ bookings, propertyId: repeatPropertyId, icon, esc }) : view === 'book' ? booking() : view === 'confirmation' ? confirmation() : view === 'owner' ? owner() : view==='manage'?hq.business():view.startsWith('field-')?hq.render(view):['studio','quotes','jobs','plans'].includes(view)?wf.render(view):myBookings()));
   const header=document.querySelector('.topbar');if(header){const measure=()=>document.documentElement.style.setProperty('--header-height',header.getBoundingClientRect().height+'px');measure();if(typeof ResizeObserver!=='undefined'){headerObserver=new ResizeObserver(measure);headerObserver.observe(header);}}
   const dates=document.querySelector('.date-options'), selectedDate=dates?.querySelector('.selected');if(dates&&selectedDate)dates.scrollLeft=selectedDate.offsetLeft;
   if (focusMain) { document.querySelector('#main').focus({preventScroll:true}); window.scrollTo({top:0,behavior:'instant'}); focusMain = false; }
@@ -217,6 +223,7 @@ document.addEventListener('click', async event => {
   if (!button) return;
   event.preventDefault();
   const action = button.dataset.action, id = button.dataset.id;
+  if(await hq.handle(action,id))return;
   if(wf.handle(action,id))return;
   if(action==='share-app'){openDialog({type:'share-app'});return;}
   if(action==='price-breakdown'){openDialog({type:'price-breakdown'});return;}
@@ -307,9 +314,10 @@ document.addEventListener('click', async event => {
   }
 });
 document.addEventListener('toggle',event=>wf.disclosure(event.target),true);
-document.addEventListener('input',event=>{if(['edit','question','answer'].includes(event.target.dataset.wf))wf.change(event.target,false);});
-document.addEventListener('change', event => {
+document.addEventListener('input',event=>{if(hq.input(event.target))return;if(['edit','question','answer'].includes(event.target.dataset.wf))wf.change(event.target,false);});
+document.addEventListener('change', async event => {
   const el=event.target;
+  if(await hq.change(el))return;
   if(wf.change(el))return;
   if (el.dataset.pack) { packed[`${ownerDate}:${el.dataset.pack}`] = el.checked; persistOperations(); render(); return; }
   if (el.dataset.service) { const id=el.dataset.service; draft.services=el.checked?[...new Set([...draft.services,id])]:draft.services.filter(s=>s!==id);draft.start=null;error='';render();announce(`Price updated to ${money(quote(draft).total)}`);return; }
@@ -335,7 +343,8 @@ document.addEventListener('keydown', event => {
 });
 // A second tab may reserve a time while this tab is reviewing. Reload local state before confirmation.
 window.addEventListener('storage', event => {
-  if([WORK_STORE,RULE_STORE].includes(event.key)){wf.reload(event.key);render();return;}
+  if(event.key==='business-hq-field-desk-v1'){hq.reload();render();return;}
+  if([WORK_STORE,RULE_STORE].includes(event.key)){wf.reload(event.key);hq.reload();render();return;}
   if (event.key === 'business-hq-operations-v2') {
     try { const next = JSON.parse(event.newValue || '{}'); packed = next.packed && typeof next.packed === 'object' ? next.packed : {}; blockedDates = Array.isArray(next.blockedDates) ? next.blockedDates.filter(d => DEMO_DATES.includes(d)) : []; render(); }
     catch { announce('Could not refresh demo preparation details.'); }
@@ -344,5 +353,8 @@ window.addEventListener('storage', event => {
     catch { announce('Could not refresh demo bookings.'); }
   }
 });
+if(view==='owner'&&new URLSearchParams(location.search).get('sample')==='1'){const existing=bookings.find(b=>b.demoScenario&&b.status==='confirmed');if(existing)ownerDate=existing.draft.date;else{const visits=sampleDay(bookings,blockedDates);if(visits.length){bookings.push(...visits);ownerDate=visits[0].draft.date;persist();}}}
+
+if(new URLSearchParams(location.search).has('sample')){const url=new URL(location.href);url.searchParams.delete('sample');history.replaceState(null,'',url);}
 render();
 if(location.hash.startsWith('#demo-booking='))recoverLink(location.href);

@@ -1,6 +1,6 @@
-import {SERVICES,DEMO_DATES,defaultDraft,quote,money,duration,dateLabel,time,slots} from './model.js?v=readable-5';
-import {DEFAULT_RULES,getRules,publishRules,visibleQuestions,validateRules} from './rules.js?v=readable-5';
-import * as domain from './workflow-model.js?v=readable-5';
+import {SERVICES,DEMO_DATES,defaultDraft,quote,money,duration,dateLabel,time,slots} from './model.js?v=field-day-8';
+import {DEFAULT_RULES,getRules,publishRules,visibleQuestions,validateRules} from './rules.js?v=field-day-8';
+import * as domain from './workflow-model.js?v=field-day-8';
 export const WORK_STORE='business-hq-workflows-v3',RULE_STORE='business-hq-rules-v3';
 export function loadPublished(){try{const saved=localStorage.getItem(RULE_STORE);if(saved)publishRules(JSON.parse(saved));}catch{ /* Use the standard catalog when saved rules cannot be loaded. */ }}
 export function createWorkflows(ctx){
@@ -114,7 +114,7 @@ export function createWorkflows(ctx){
     }catch(err){ctx.error(err.message);ctx.render();return true;}
   }
   sync();
-  return {questions,nav,primaryNav,disclosure:el=>{if(!el.isConnected)return;if(el.dataset.wfDisclosure==='preview')previewOpen=el.open;if(el.dataset.wfDisclosure==='questions')questionsOpen=el.open;},dialog,handle,change,customerJob,plans,quotes,render:view=>view==='manage'?manage():view==='studio'?studio():view==='quotes'?quotes(true):view==='jobs'?jobs():plans(true),sync,
+  return {getWork:()=>work,commit,questions,nav,primaryNav,disclosure:el=>{if(!el.isConnected)return;if(el.dataset.wfDisclosure==='preview')previewOpen=el.open;if(el.dataset.wfDisclosure==='questions')questionsOpen=el.open;},dialog,handle,change,customerJob,plans,quotes,render:view=>view==='manage'?manage():view==='studio'?studio():view==='quotes'?quotes(true):view==='jobs'?jobs():plans(true),sync,
     quoteContact:d=>`<section class="panel"><h3>Where should Joe send the quote?</h3><p>Fictional details only. No real message is sent.</p><div class="fields">${field('Name','quote-name',d.name,'text','data-field="name"')}${field('Email','quote-email',d.email,'email','data-field="email"')}${field('Phone','quote-phone',d.phone,'tel','data-field="phone"')}</div></section>`,
     complete:(id,actual)=>commit(domain.finishJob(work,ctx.getBookings(),id,actual,ctx.blocked())),
     booked:(d,id)=>{work=domain.acceptQuoteBooking(work,d,id);save();},

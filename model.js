@@ -1,4 +1,4 @@
-import { DEFAULT_RULES, getRules, effects } from './rules.js?v=readable-5';
+import { DEFAULT_RULES, getRules, effects } from './rules.js?v=field-day-8';
 export const SERVICES = {
   leaves: { name: 'Fall leaf cleanup', category: 'Lawn & yard', icon: 'leaf', description: 'A fresh start for your lawn, beds, and walkways.', base: 150, minutes: 90, tools: ['Leaf blower', 'Rake', 'Leaf bags', 'Gloves'] },
   gutters: { name: 'Gutter cleaning', category: 'Home exterior', icon: 'house', description: 'Clear gutters. Flowing downspouts. Ready for the rain.', base: 120, minutes: 90, tools: ['Ladder', 'Gutter scoop', 'Hose', 'Safety equipment'] },
@@ -58,7 +58,7 @@ export function validBooking(draft, bookings = [], excludingId = null, blockedDa
   if (!quote(draft).serviceable) return 'This property is outside Joe’s demo service area.';
   if (quote(draft).assessment) return 'Homes with three or more stories need an assessment before booking.';
   if (!slots(draft, bookings, excludingId, blockedDates).includes(draft.start)) return 'That appointment no longer fits. Please choose an available time.';
-  if (!draft.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email) || draft.phone.replace(/\D/g, '').length < 10) return 'Add a name, valid email, and phone number to continue.';
+  if (!draft.name.trim() || ((!draft.ownerCreated || draft.email.trim()) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) || draft.phone.replace(/\D/g, '').length < 10) return 'Add a name, valid email, and phone number to continue.';
   if (!draft.property.trim()) return 'Add the service address to continue.';
   return '';
 }

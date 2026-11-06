@@ -13,11 +13,25 @@ A static HTML/CSS/JavaScript sample for returning customers and a solo home-serv
 - The estimate stays on the booking page. On phones, tapping the footer total opens a price-breakdown sheet without losing the current step or answers.
 - **My day / Week / Month** provide detail and overview separately. Week/month buttons navigate periods; working-day tiles open the daily jobs and checklist. Week view combines estimated tools and materials for remaining confirmed work. Completed jobs stay in calendar history, cancelled jobs are omitted, and proposed holds are shown separately.
 
-## Owner navigation on phones
+## Landscaper field desk
 
-The owner workspace has four persistent destinations: **My day**, **Jobs & money**, **Requests**, and **My business**. My day shows the schedule, next stop, preparation, and decisions. My business contains **Services & prices**, repeat customers, and an explicit customer-page preview.
+Open **[the owner working-day sample](https://rikbanerjee.github.io/smbOS/?view=owner&sample=1)**. The explicit sample link adds two fictional visits only when no active working-day sample exists; it preserves existing jobs and history. Normal refresh remembers the selected sample workday within the tab.
 
-On phones, service setup starts with the selected service, price, and time needed. Customer questions and customer preview are expandable sections. A fixed **Save changes** action and saved/unsaved labels keep the edit state clear. Unsaved changes survive navigation within the open page; save before refreshing. Refreshing an owner view returns that tab to My day. Customer and owner navigation stay separate; switch explicitly through the demo's customer-page or workspace controls.
+The four owner destinations are **My day**, **Schedule**, **To do**, and **My business**:
+
+- **My day:** next customer, agreed work/price, arrival and finish times, a combined tools/materials load-up list, and the day in order. Load-up checkmarks use the existing operations storage. Changed material quantities must be checked again. Schedule provides the existing week/month views; My day remains focused on doing today's work.
+- **Open job:** guided scheduled → on the way → working → completed steps; scope, access, saved parking information, per-service work checklist, private job notes, property notes, optional before/after photos, and activity history. Approved extras become explicit checklist items. Equipment, access, and job scope remain visible without opening configuration.
+- **Finish:** confirm the agreed work is complete, record actual minutes and leaf bags used, and update supply stock once. Completion leaves payment separate. Record partial/full fictional cash or test-card payments, or preview a follow-up for a completed unpaid job.
+- **Phone bookings:** Add a job records an agreed service, scope, date, and complete fitting slot. Email is optional for an owner-created phone job, while any supplied email must be valid. Normal customer bookings retain email validation. The customer-agreement checkbox is required; assessment/quote-only services still need a reviewed quote through the existing quote workflow.
+- **Changes:** propose a different appointment without moving the original. The new slot is held until the customer accepts or declines in My bookings. Extra work also remains pending until customer approval and must fit calendar capacity. Unstarted, unpaid appointments can be released only after recording customer agreement; started/paid/pending-change work is protected.
+- **To do:** owner actions (quotes, access, completed unpaid jobs, equipment/supply issues) are separate from customer approvals still pending.
+- **My business:** services/prices, My kit, customer/property history, detailed jobs/money, repeat visits, customer-page preview, and private record export. My kit flags unavailable equipment and tracks leaf-bag stock. Quantities are estimates, not live inventory integration.
+
+Field records use `business-hq-field-desk-v1`; existing booking, rules, workflow, and preparation storage keys remain unchanged. Photos are compressed locally (six per job, JPG/PNG/WebP input under 8 MB, compressed output under 350 KB each). Browser storage is limited; a quota failure is reported. JSON exports contain job, payment, and field records but exclude photo bytes. Keep exports private. No photo or private note is uploaded by the prototype.
+
+Try: load a sample day → mark tools loaded → open Mary's job → record on-the-way / start → add a note/photo → finish with 88 minutes and 4 bags → record $50 cash → see the remaining $148 in To do. Try Dave's access confirmation, My kit shortages, a phone booking with no email, and customer approval of a reschedule or extra work.
+
+The header Help control explains the flow and demo boundaries. All notifications, approvals, and payments remain browser-local role-play. This work does not merge the separately reviewed customer-home/promotion zip.
 
 ## New: five connected workflows
 
@@ -60,11 +74,11 @@ Open `http://127.0.0.1:4181/`. Node.js is only needed to run the domain checks:
 npm test
 ```
 
-Tests cover conditional rule effects, immutable price/scope snapshots, quotes, additional-work approval and conflicts, completion, partial payments, repeat-plan reservations and pausing, plus earlier departure buffers, weather holds, packing, and property history. No install or build step is required.
+Tests additionally cover field progression, phone bookings, completion/stock consumption, approval holds, cancellations, payment summaries, and load-up shortages. Tests cover conditional rule effects, immutable price/scope snapshots, quotes, additional-work approval and conflicts, completion, partial payments, repeat-plan reservations and pausing, plus earlier departure buffers, weather holds, packing, and property history. No install or build step is required.
 
 ## Hosting
 
-GitHub Pages source: **main / repository root**. Keep `index.html`, `styles.css`, `app.js`, `model.js`, `operations.js`, `experience.js`, `rules.js`, `workflow-model.js`, and `workflow-ui.js`, `calendar.js`, and `readability.css` together. `.nojekyll` disables Jekyll processing. Pushing to `main` publishes the static site through GitHub Pages.
+GitHub Pages source: **main / repository root**. Keep `index.html`, `styles.css`, `app.js`, `model.js`, `operations.js`, `experience.js`, `rules.js`, `workflow-model.js`, and `workflow-ui.js`, `calendar.js`, `readability.css`, `owner-model.js`, `owner-hq.js`, and `owner.css` together. `.nojekyll` disables Jekyll processing. Pushing to `main` publishes the static site through GitHub Pages.
 
 ## Demo limits
 

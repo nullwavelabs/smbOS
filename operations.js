@@ -1,4 +1,4 @@
-import { BUFFER, DEMO_DATES, defaultDraft, quote, slots, validBooking } from './model.js?v=readable-5';
+import { BUFFER, DEMO_DATES, defaultDraft, quote, slots, validBooking } from './model.js?v=field-day-8';
 
 export const DEMO_CLOCK = 780; // Deliberate sample clock: 1 PM on the selected workday.
 export const PROPERTIES = [
@@ -128,7 +128,7 @@ export function respondToRainChange(bookings, id, accept, blockedDates = []) {
     const next = structuredClone(b.pendingChange.draft);
     const validation = validBooking(next, working, b.id, blockedDates);
     if (validation) throw new Error(validation);
-    b.previousAppointments = [...(b.previousAppointments ?? []), { date: b.draft.date, start: b.draft.start, total: b.total, reason: 'Customer accepted rain change' }];
+    b.previousAppointments = [...(b.previousAppointments ?? []), { date: b.draft.date, start: b.draft.start, total: b.total, reason: b.pendingChange.reason==='Rain delay'?'Customer accepted rain change':'Customer accepted schedule change' }];
     Object.assign(b, { draft: next, ...quote(next), changeDeclined: false });
   } else {
     b.changeDeclined = true;
