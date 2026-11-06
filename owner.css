@@ -28,3 +28,4 @@
 @media(max-width:1050px){.hq-job-columns{display:flex;flex-direction:column;gap:0}.hq-job-columns>div,.hq-job-columns>aside{display:contents}.hq-job-columns .panel{width:100%;margin-bottom:22px!important}.hq-job-columns>aside>.panel:nth-child(1){order:0}.hq-job-columns>div>.panel:nth-child(1){order:1}.hq-job-columns>aside>.panel:nth-child(2){order:2}.hq-job-columns>div>.panel:nth-child(2){order:3}.hq-job-columns>aside>.panel:nth-child(3){order:4}.hq-job-columns>aside>.hq-waiting{order:2}.hq-job-columns>div>.hq-history{order:5}}
 .hq-help-list{padding-left:22px;margin:20px 0}.hq-help-list li{font-size:16px;line-height:1.7;margin:12px 0;color:#38523c}.hq-decision-record{display:flex;gap:8px;align-items:center;font-size:14px!important;margin-top:15px;flex-wrap:wrap}
 .hq-stage-track.is-cancelled{display:none}
+@media(max-width:620px){.hq-next-times strong{font-size:clamp(16px,5vw,20px);white-space:nowrap}.hq-next-times small{white-space:nowrap}}
