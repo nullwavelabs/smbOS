@@ -66,3 +66,6 @@ test('pressing Done early keeps the section open and explains what is missing',a
   await page.click('section-done','details');assert.match(page.root.innerHTML,/Finish the highlighted items to continue\./);assert.ok(page.root.innerHTML.includes('data-need="stories"'));assert.ok(!/step-section done[^>]*data-section="details"/.test(page.root.innerHTML));
  }finally{page.restore();}
 });
+test('both Continue buttons stay pressable before a start time is picked',async()=>{
+ const page=await boot('https://example.test/?view=customer');try{await page.click('rebook-selected');assert.match(page.root.innerHTML,/Find your Thursday/);assert.ok(!/data-action="next"[^>]* disabled/.test(page.root.innerHTML));}finally{page.restore();}
+});
