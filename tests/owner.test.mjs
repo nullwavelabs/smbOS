@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as f from '../owner-model.js?v=field-day-8';
-import {sampleDay,respondToRainChange} from '../operations.js?v=field-day-8';
-import {freshWork,proposeExtra,invoiceFor,recordPayment,balance} from '../workflow-model.js?v=field-day-8';
-import {defaultDraft,validBooking,slots} from '../model.js?v=field-day-8';
+import * as f from '../owner-model.js?v=combined-10';
+import {sampleDay,respondToRainChange} from '../operations.js?v=combined-10';
+import {freshWork,proposeExtra,invoiceFor,recordPayment,balance} from '../workflow-model.js?v=combined-10';
+import {defaultDraft,validBooking,slots} from '../model.js?v=combined-10';
 
 test('load-up readiness preserves checked quantities and surfaces shortages and unavailable equipment',()=>{
  const visits=sampleDay(),desk=f.freshDesk();desk.stock['Leaf bags']=4;desk.unavailable=['Rake'];
@@ -20,7 +20,7 @@ test('a solo owner cannot start a second job or move an in-progress job backward
 test('completion records actual materials once, keeps payment outstanding, and advances the next job',()=>{
  const visits=sampleDay(),desk=f.freshDesk(),work=freshWork();visits.forEach(b=>invoiceFor(work,b));
  const result=f.completeFieldJob(desk,work,visits,visits[0].id,88,4,true);
- assert.equal(result.bookings[0].status,'completed');assert.equal(result.bookings[0].actualMinutes,88);assert.equal(result.desk.stock['Leaf bags'],20);assert.equal(desk.stock['Leaf bags'],24);assert.equal(balance(result.work.invoices[0]),198);
+ assert.equal(result.bookings[0].status,'completed');assert.equal(result.bookings[0].actualMinutes,88);assert.equal(result.desk.stock['Leaf bags'],20);assert.equal(desk.stock['Leaf bags'],24);assert.equal(balance(result.work.invoices[0]),175.5);
  assert.equal(f.dayOverview(result.bookings,'2026-10-29',result.desk,{},result.work).next.id,visits[1].id);
  assert.throws(()=>f.completeFieldJob(result.desk,result.work,result.bookings,visits[0].id,88,4,true),/completing/);
 });
@@ -32,7 +32,7 @@ test('unconfirmed completion, insufficient materials, and pending approval leave
 });
 test('phone jobs accept missing email, but customer bookings and malformed supplied emails are validated',()=>{
  const d={...f.newPhoneDraft('2026-11-05'),name:'Test Customer',phone:'4015550199',property:'Test address',start:795};
- const b=f.addPhoneJob([],d,true);assert.equal(b.total,198);assert.equal(b.source,'phone');assert.equal(b.draft.email,'');
+ const b=f.addPhoneJob([],d,true);assert.equal(b.total,175.5);assert.equal(b.source,'phone');assert.equal(b.draft.email,'');
  assert.throws(()=>f.addPhoneJob([b],d,true),/available time/);assert.throws(()=>f.addPhoneJob([],d,false),/agreed/);
  assert.match(validBooking({...d,ownerCreated:false}),/valid email/);assert.match(validBooking({...d,email:'invalid'}),/valid email/);
 });
@@ -43,10 +43,10 @@ test('phone jobs obey scope, required questions, blocked days, and complete visi
  assert.throws(()=>f.addPhoneJob([],d,true,['2026-11-05']),/available time/);assert.throws(()=>f.addPhoneJob([],{...d,services:['leaves','gutters','mowing']},true),/available time/);
 });
 test('proposed appointment changes hold capacity without moving or repricing the original appointment',()=>{
- const visits=sampleDay(),moved=f.proposeAppointment(visits,visits[1].id,'2026-11-05',795);
+ const visits=sampleDay(),moved=f.proposeAppointment(visits,visits[1].id,'2026-12-03',795);
  assert.equal(moved[1].draft.date,'2026-10-29');assert.equal(moved[1].total,156);assert.equal(moved[1].pendingChange.total,168);
- assert.ok(!slots({...defaultDraft(),date:'2026-11-05'},moved).includes(795));
- const accepted=respondToRainChange(moved,visits[1].id,true);assert.equal(accepted[1].draft.date,'2026-11-05');assert.equal(accepted[1].total,168);assert.equal(accepted[1].previousAppointments[0].reason,'Customer accepted schedule change');
+ assert.ok(!slots({...defaultDraft(),date:'2026-12-03'},moved).includes(795));
+ const accepted=respondToRainChange(moved,visits[1].id,true);assert.equal(accepted[1].draft.date,'2026-12-03');assert.equal(accepted[1].total,168);assert.equal(accepted[1].previousAppointments[0].reason,'Customer accepted schedule change');
  assert.equal(visits[1].pendingChange,undefined);assert.throws(()=>f.proposeAppointment(moved,visits[1].id,'2026-11-12',795),/cannot be changed/);
 });
 test('To do separates owner actions from customer approvals and excludes cancelled jobs',()=>{
@@ -57,7 +57,7 @@ test('To do separates owner actions from customer approvals and excludes cancell
 });
 test('payment collection and completion are independent and summaries reflect partial payments',()=>{
  const visits=sampleDay(),work=freshWork();visits.forEach(b=>invoiceFor(work,b));const paid=recordPayment(work,work.invoices[0].id,50,'cash');
- const summary=f.dayOverview(visits,'2026-10-29',f.freshDesk(),{},paid);assert.equal(summary.collected,50);assert.equal(summary.balance,304);assert.equal(summary.remaining.length,2);
+ const summary=f.dayOverview(visits,'2026-10-29',f.freshDesk(),{},paid);assert.equal(summary.collected,50);assert.equal(summary.balance,281.5);assert.equal(summary.remaining.length,2);
 });
 test('job notes and property notes remain separate and customer records group properties correctly',()=>{
  const visits=sampleDay();let desk=f.saveRecord(f.freshDesk(),visits[0].id,{note:'Leave beds alone'});desk=f.logEvent(desk,visits[0].id,'Site checked','2026-10-29T17:00:00Z');

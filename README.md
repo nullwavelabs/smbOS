@@ -4,11 +4,23 @@ A static HTML/CSS/JavaScript sample for returning customers and a solo home-serv
 
 **Live site:** [rikbanerjee.github.io/smbOS](https://rikbanerjee.github.io/smbOS/)
 
+## Combined customer and owner release
+
+Derek's November 1 customer-home package is now integrated on top of the landscaper field desk. See [integration details](docs/customer-zip-integration.md) for the source package and conflict resolutions.
+
+- Customers now have the Share control, Eastern-time opening status and weekly-hours dialog, a compact fall promotion, discounted service prices, and the Recently ordered selection/rebooking flow.
+- The owner keeps My day, Schedule, To do, My business, Help, job progression, phone bookings, notes/photos, equipment, stock, payments, customer history, and export.
+- New visits receive a snapshot of the current promotion: 15% off leaf cleanup and 10% off gutters for September–November visits, including future years. These are prototype campaign rates, configured in `model.js`. November's medium leaf+gutter bundle is $347.25 including one $48 travel charge; December's is $393.
+- Existing saved bookings retain the earlier October-2026-only gutter policy and their stored agreed totals. Adding $25 to a pre-existing $198 leaf job produces $223. Owner-approved fixed quotes show no separate automatic promotion deductions.
+- New rebookings use the current promotion. Changed service selections, newly changed questions, or missing required answers open scope review before scheduling. Unchanged service selections retain the quick path.
+- Browser-local storage keys are preserved. Asset URLs use `combined-10` so refreshed tabs load a consistent release.
+- Logic and Node rendering/event smoke checks cover both sides. Visual browser verification for this integration was unavailable because local browser use was disabled in Work settings.
+
 ## Sharing, readability, and calendar overview
 
-- One larger sticky company header shows the brand, tagline, Thursday hours, and contact control. Owners also have **Share** at the top right. Copy the public booking link or open the device's share options. The link opens the customer page even if that tab previously used owner mode, and carries no booking details.
-- Body text, controls, and helper text are larger, with darker text, stronger card boundaries, and fewer repeated header sections. The personal “Or, a little different this time?” heading remains.
-- Seasonal guidance sits above the returning-customer shortcut. October pricing still depends on the sample service date; choosing a later date recalculates the estimate.
+- One sticky company header shows the brand, tagline, and live Eastern-time opening status. Both sides have **Share**; customers have Call and owners have Help. Opening the status shows the full weekly hours. Copy the public booking link or open the device's share options. The link opens the customer page even if that tab previously used owner mode, and carries no booking details.
+- Body text, controls, and helper text are larger, with darker text, stronger card boundaries, and fewer repeated header sections. The integrated customer home uses Derek’s greeting and “Services we offer” heading, with readable sizes retained on phones.
+- Seasonal guidance sits above the greeting and recently ordered shortcuts. New visits use the September–November campaign; choosing a December date recalculates the estimate at regular prices.
 - Service selectors appear before their scope and conditional questions. New bookings no longer ask where to park; existing saved notes remain available to the owner.
 - The estimate stays on the booking page. On phones, tapping the footer total opens a price-breakdown sheet without losing the current step or answers.
 - **My day / Week / Month** provide detail and overview separately. Week/month buttons navigate periods; working-day tiles open the daily jobs and checklist. Week view combines estimated tools and materials for remaining confirmed work. Completed jobs stay in calendar history, cancelled jobs are omitted, and proposed holds are shown separately.
@@ -29,13 +41,13 @@ The four owner destinations are **My day**, **Schedule**, **To do**, and **My bu
 
 Field records use `business-hq-field-desk-v1`; existing booking, rules, workflow, and preparation storage keys remain unchanged. Photos are compressed locally (six per job, JPG/PNG/WebP input under 8 MB, compressed output under 350 KB each). Browser storage is limited; a quota failure is reported. JSON exports contain job, payment, and field records but exclude photo bytes. Keep exports private. No photo or private note is uploaded by the prototype.
 
-Try: load a sample day → mark tools loaded → open Mary's job → record on-the-way / start → add a note/photo → finish with 88 minutes and 4 bags → record $50 cash → see the remaining $148 in To do. Try Dave's access confirmation, My kit shortages, a phone booking with no email, and customer approval of a reschedule or extra work.
+Try: load a sample day → mark tools loaded → open Mary's job → record on-the-way / start → add a note/photo → finish with 88 minutes and 4 bags → record $50 cash → see the remaining $125.50 in To do for a fresh discounted sample ($148 for a legacy $198 job). Try Dave's access confirmation, My kit shortages, a phone booking with no email, and customer approval of a reschedule or extra work.
 
-The header Help control explains the flow and demo boundaries. All notifications, approvals, and payments remain browser-local role-play. This work does not merge the separately reviewed customer-home/promotion zip.
+The header Help control explains the flow and demo boundaries. All notifications, approvals, and payments remain browser-local role-play. The customer-home/promotion zip is integrated in the combined release described below.
 
 ## New: five connected workflows
 
-1. **Service setup:** open **Joe’s workspace → My business → Services & prices**. Edit starting price/time, booking mode, and questions. Questions support select/text/number answers, required answers, conditions based on earlier questions, and matching-answer effects on price, duration, preparation, and owner review. Try the live customer preview, then **Save changes**. Publishing is browser-local and applies to new visits; agreed visits keep a snapshot of their rules and prices.
+1. **Service setup:** open **Joe’s workspace → My business → Services & prices**. Edit starting price/time, booking mode, and questions. Questions support select/text/number answers, required answers, conditions based on earlier questions, and matching-answer effects on price, duration, preparation, and owner review. Try the live customer preview, then **Save changes**. Publishing is browser-local and applies to new visits; agreed visits keep snapshots of their catalog and promotion policy.
 2. **Quote to booking:** start a gutter visit and choose **3 or more stories**, or publish a quote-only service. Submit **Request an owner quote**. In **Joe’s workspace → Requests**, provide an exact total including travel, service time, and included work. Switch to **My bookings** to accept the offer, choose a fitting slot, and confirm. A request/offer itself reserves no time; accepting a newer quote invalidates an earlier review. Declining an offer creates no appointment.
 3. **Multiple services:** add services in the customer scope screen. The visit combines service time, question effects, tools, and a single travel charge. Only whole-visit slots are offered. Oversized combinations can request an owner quote instead of bypassing capacity rules.
 4. **Job to payment:** use **Jobs & money** to mark on-the-way or started, propose additional work, and complete a job with actual time. In **My bookings**, approve or decline extras. Approval updates time, preparation, and invoice total only if the enlarged visit fits the calendar; pending extras block completion. Owner invoice controls record partial/full fictional cash payments and preview a payment follow-up; the customer hub records a fictional remaining-balance payment. Job completion and payment status are independent. No real payment or message is sent.
@@ -47,11 +59,11 @@ Storage adds `business-hq-rules-v3` and `business-hq-workflows-v3`. Existing v1 
 
 ## Earlier returning-customer and weather experiences
 
-1. **Returning customer:** on the home page, choose **Book again**. Switch between Mary's home and rental to see remembered services, property scope, access, parking, and previous service time. Choose **Nothing changed — choose a time** for the shorter path or **Something changed** to edit the scope. Review the freshly calculated total before confirming.
+1. **Returning customer:** on the home page, select services in **Recently ordered**, then choose **Book again**. Unchanged services take the fast scheduling path. Changed selections or booking questions open scope review first. Property details and applicable saved answers are remembered; totals use the current campaign and require review before confirmation.
 2. **Provider's working day:** choose **Try Joe's working day** or open **Joe's workspace → Try a sample day**. Two fictional visits appear on an available sample day without replacing existing bookings. Check the next departure, route details, job scopes, access, parking, combined tools/materials, and the missing-access attention item. Preview the customer's answer and save it. Complete a job and record the actual minutes to update that property's repeat-booking history.
 3. **Rain delay:** with a sample day loaded, select **Plan a rain delay**. Review proposed new times and prices, then **Send demo change requests**. The original appointments remain confirmed and the proposed slots are reserved. Select the proposed date in Joe's workspace to see held proposals. Open **My bookings** to role-play each customer's acceptance or decline. Acceptance moves the visit and confirms the displayed new price; decline preserves the original and flags follow-up for Joe. New bookings on the rain day stay paused.
 
-On the October sample day, Dave's gutter visit moves from **$156 to $168** in November because the October discount expires. This is disclosed before owner approval and again before customer acceptance.
+For new bookings, Dave’s gutter visit remains **$156** when moved from October to November, then becomes **$168** in December. Existing bookings made under the earlier October-only promotion still disclose any loss of that discount when moved into November.
 
 ## Scheduling and persistence
 

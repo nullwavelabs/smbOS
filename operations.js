@@ -1,4 +1,5 @@
-import { BUFFER, DEMO_DATES, defaultDraft, quote, slots, validBooking } from './model.js?v=field-day-8';
+import {DEFAULT_RULES} from './rules.js?v=combined-10';
+import { SERVICES, BUFFER, DEMO_DATES, defaultDraft, quote, slots, validBooking } from './model.js?v=combined-10';
 
 export const DEMO_CLOCK = 780; // Deliberate sample clock: 1 PM on the selected workday.
 export const PROPERTIES = [
@@ -7,6 +8,7 @@ export const PROPERTIES = [
     size: 'medium', stories: 1, access: 'Use the side gate. Please close it afterward.',
     parking: 'Left side of the driveway', accessConfirmed: true,
     lastVisit: { date: '2025-11-06', services: ['leaves'], haul: false, minutes: 135, size: 'medium' },
+    orderHistory: [{ date: '2025-10-16', services: ['gutters'] }, { date: '2025-07-17', services: ['mowing'] }],
     propertyAllowance: true,
   },
   {
@@ -23,19 +25,40 @@ export function propertyHistory(property, bookings = []) {
     .sort((a, b) => b.draft.date.localeCompare(a.draft.date));
   if (!completed.length) return property.lastVisit;
   const b = completed[0];
-  return { date: b.draft.date, services: [...b.draft.services], haul: b.draft.haul, size: b.draft.size, stories: b.draft.stories, minutes: b.actualMinutes ?? b.minutes, access: b.draft.access, parking: b.draft.parking, accessConfirmed: b.draft.accessConfirmed, property: b.draft.property, area: b.draft.area };
+  return { answers:structuredClone(b.draft.answers??{}),catalogSnapshot:structuredClone(b.draft.catalogSnapshot??DEFAULT_RULES),date: b.draft.date, services: [...b.draft.services], haul: b.draft.haul, size: b.draft.size, stories: b.draft.stories, minutes: b.actualMinutes ?? b.minutes, access: b.draft.access, parking: b.draft.parking, accessConfirmed: b.draft.accessConfirmed, property: b.draft.property, area: b.draft.area };
+}
+
+// Each service ordered for this property, most recent first: [{ id, date }].
+export function recentServices(property, bookings = []) {
+  const orders = [
+    ...bookings.filter(b => b.status === 'completed' && b.draft.propertyId === property.id).map(b => ({ date: b.draft.date, services: b.draft.services })),
+    property.lastVisit, ...(property.orderHistory ?? []),
+  ].filter(Boolean).sort((a, b) => b.date.localeCompare(a.date));
+  const latest = new Map();
+  orders.forEach(order => order.services.forEach(id => { if (SERVICES[id]&&!latest.has(id)) latest.set(id, order.date); }));
+  return [...latest].map(([id, date]) => ({ id, date }));
 }
 
 export function repeatDraft(property, bookings = []) {
   const previous = propertyHistory(property, bookings);
   return {
-    ...defaultDraft(), services: [...previous.services], size: previous.size,
+    ...defaultDraft(), answers:structuredClone(previous.answers??{}),services: [...previous.services], size: previous.size,
     haul: previous.haul, stories: previous.stories ?? property.stories, area: previous.area ?? property.area,
     property: previous.property ?? property.address, propertyId: property.id, parking: previous.parking ?? property.parking,
     access: previous.access ?? property.access, accessConfirmed: previous.accessConfirmed ?? property.accessConfirmed,
     propertyAllowance: property.propertyAllowance, scopeConfirmed: true,
     notes: previous.access ?? property.access,
   };
+}
+
+// The fast path is safe only for the same services and unchanged booking questions.
+export function recentDraft(property,bookings,picked){
+ const previous=propertyHistory(property,bookings),draft=repeatDraft(property,bookings);
+ draft.services=[...new Set(picked)].filter(id=>SERVICES[id]);
+ const same=draft.services.length===previous.services.length&&draft.services.every(id=>previous.services.includes(id));
+ const changed=draft.services.some(id=>JSON.stringify(draft.catalogSnapshot[id].questions)!==JSON.stringify((previous.catalogSnapshot??DEFAULT_RULES)[id]?.questions));
+ const needsReview=!same||changed||quote(draft).missing.length>0;
+ draft.scopeConfirmed=!needsReview;return {draft,needsReview};
 }
 
 export function packingList(bookings, date) {

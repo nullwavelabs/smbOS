@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEMO_DATES, defaultDraft, quote, slots, validBooking } from '../model.js?v=field-day-8';
+import { DEMO_DATES, defaultDraft, quote, slots, validBooking } from '../model.js?v=combined-10';
 import { PROPERTIES, propertyHistory, repeatDraft, packingList, dayPlan, readiness, sampleDay, proposeRainPlan, approveRainPlan, respondToRainChange } from '../operations.js';
 
 test('repeat booking recalls the property and scope but recalculates current pricing', () => {
@@ -10,7 +10,7 @@ test('repeat booking recalls the property and scope but recalculates current pri
   assert.equal(draft.parking, PROPERTIES[0].parking);
   assert.equal(draft.accessConfirmed, true);
   assert.equal(quote(draft).minutes, 135);
-  assert.equal(quote(draft).total, 273);
+  assert.equal(quote(draft).total, 239.25);
 });
 test('completed jobs update remembered service scope and actual time', () => {
   const completed = { ...sampleDay()[0], status: 'completed', actualMinutes: 104 };
@@ -48,7 +48,7 @@ test('slots include first and final travel and reject unsupported days/scopes', 
   assert.deepEqual(slots({ ...d, area: 'outside' }), []);
   assert.deepEqual(slots({ ...d, stories: 3 }), []);
   assert.equal(quote(d).travel, 48);
-  assert.equal(quote(d).discount, 12);
+  assert.equal(quote(d).discount, 45.75);
 });
 test('rain proposals preserve original appointments and independently allocate both new jobs', () => {
   const visits = sampleDay(), originals = structuredClone(visits);
@@ -75,17 +75,17 @@ test('proposed holds block other customers, while the rain day can be paused', (
   assert.deepEqual(slots(defaultDraft(), pending, null, ['2026-10-29']), []);
 });
 test('customer acceptance updates the slot and explicit price, then releases the original', () => {
-  const visits = sampleDay(), plan = proposeRainPlan(visits, visits[0].draft.date);
+  const visits = sampleDay(); for(const b of visits){b.draft.date='2026-11-26';Object.assign(b,quote(b.draft));} const plan = proposeRainPlan(visits, visits[0].draft.date);
   const pending = approveRainPlan(visits, plan);
   const gutter = pending[1];
   assert.equal(gutter.total, 156);
   assert.equal(gutter.pendingChange.total, 168);
   const accepted = respondToRainChange(pending, gutter.id, true);
   const changed = accepted.find(b => b.id === gutter.id);
-  assert.equal(changed.draft.date, '2026-11-05');
+  assert.equal(changed.draft.date, '2026-12-03');
   assert.equal(changed.total, 168);
   assert.equal(changed.pendingChange, undefined);
-  assert.equal(changed.previousAppointments[0].date, '2026-10-29');
+  assert.equal(changed.previousAppointments[0].date, '2026-11-26');
   assert.ok(slots(gutter.draft, accepted).includes(gutter.draft.start));
 });
 test('declining retains the original confirmed job and releases only the proposed hold', () => {

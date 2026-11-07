@@ -1,5 +1,5 @@
-import {getRules} from './rules.js?v=field-day-8';
-import {quote, slots, validBooking, DEMO_DATES, BUFFER} from './model.js?v=field-day-8';
+import {getRules} from './rules.js?v=combined-10';
+import {quote, slots, validBooking, freshPromotion, DEMO_DATES, BUFFER} from './model.js?v=combined-10';
 export const freshWork=()=>({quotes:[],extras:[],invoices:[],plans:[],seasonal:[]});
 export const uid=prefix=>`${prefix}-${crypto.randomUUID().slice(0,8).toUpperCase()}`;
 const clone=x=>structuredClone(x);
@@ -29,7 +29,7 @@ export function acceptQuoteBooking(work,draft,bookingId) {
   const next=clone(work);if(!draft.approvedOffer)return next;
   const q=next.quotes.find(q=>q.id===draft.approvedOffer.quoteId);
   if(q?.status!=='offered'||q.revision!==draft.approvedOffer.revision)throw Error('The quote changed. Review the latest offer before booking.');
-  if(['services','size','haul','stories','area','property','answers','catalogSnapshot'].some(key=>JSON.stringify(draft[key])!==JSON.stringify(q.draft[key])))throw Error('The agreed scope changed. Request a revised quote before booking.');
+  if(['services','size','haul','stories','area','property','answers','catalogSnapshot','promotionSnapshot'].some(key=>JSON.stringify(draft[key])!==JSON.stringify(q.draft[key])))throw Error('The agreed scope changed. Request a revised quote before booking.');
   q.status='accepted';q.bookingId=bookingId;return next;
 }
 export function proposeExtra(work,bookings,id,title,price,minutes,prep) {
@@ -63,7 +63,7 @@ export function repeatPreview(bookings,sourceId,frequency,blocked=[]) {
   for(let n=0;n<3;n++){
     const date=new Date(target+'T12:00:00Z');date.setUTCDate(date.getUTCDate()+step);target=date.toISOString().slice(0,10);
     if(!DEMO_DATES.includes(target)){skipped.push({date:target,reason:'Outside the sample calendar'});continue;}
-    const draft={...clone(source.draft),catalogSnapshot:getRules(),date:target,start:null,approvedOffer:undefined,extraWork:[]};
+    const draft={...clone(source.draft),catalogSnapshot:getRules(),promotionSnapshot:freshPromotion(),date:target,start:null,approvedOffer:undefined,extraWork:[]};
     if(quote(draft).assessment){skipped.push({date:target,reason:'A fresh owner quote is needed'});continue;}
     const available=slots(draft,[...bookings,...visits],null,blocked);draft.start=available.includes(source.draft.start)?source.draft.start:available[0];
     if(draft.start===undefined){skipped.push({date:target,reason:'No complete visit fits'});continue;}

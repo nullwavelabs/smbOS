@@ -1,5 +1,5 @@
-import { AREAS, BUFFER, SERVICES, DEMO_DATES, quote, money, time, duration, dateLabel } from './model.js?v=field-day-8';
-import { PROPERTIES, DEMO_CLOCK, propertyHistory, repeatDraft, dayPlan, readiness } from './operations.js?v=field-day-8';
+import { AREAS, BUFFER, SERVICES, DEMO_DATES, quote, money, time, duration, dateLabel } from './model.js?v=combined-10';
+import { PROPERTIES, DEMO_CLOCK, propertyHistory, repeatDraft, dayPlan, readiness } from './operations.js?v=combined-10';
 
 export function repeatExperience({ bookings, propertyId, icon, esc }) {
   const saved = PROPERTIES.find(p => p.id === propertyId) ?? PROPERTIES[0];
@@ -47,7 +47,7 @@ function errorMarkup(message, className) { return message ? `<div class="${class
 
 export function weatherReview({ plan, bookings, icon, esc }) {
   return `<h2 id="dialog-title">Rain happens. Let’s make a plan.</h2><p>Review Joe’s proposed changes for ${dateLabel(plan.sourceDate)}. Nothing moves until the customer accepts. No actual message is sent.</p>
-    ${plan.proposals.map(p => { const b = bookings.find(b => b.id === p.id); return `<div class="weather-proposal"><div class="booking-card-top"><h3>${esc(b.draft.name)}</h3><span class="tag">Proposed</span></div><p>${dateLabel(b.draft.date)} · ${time(b.draft.start)} <span aria-hidden="true">→</span><br><strong>${dateLabel(p.draft.date)} · ${time(p.draft.start)}</strong></p><p>Visit ${duration(quote(p.draft).minutes)} + ${BUFFER} min buffer<br>Price ${money(p.oldTotal)} → <strong>${money(p.total)}</strong></p>${p.total !== p.oldTotal ? '<div class="notice warning">October’s gutter offer expires. The customer must accept the new price.</div>' : ''}</div>`; }).join('')}
+    ${plan.proposals.map(p => { const b = bookings.find(b => b.id === p.id); return `<div class="weather-proposal"><div class="booking-card-top"><h3>${esc(b.draft.name)}</h3><span class="tag">Proposed</span></div><p>${dateLabel(b.draft.date)} · ${time(b.draft.start)} <span aria-hidden="true">→</span><br><strong>${dateLabel(p.draft.date)} · ${time(p.draft.start)}</strong></p><p>Visit ${duration(quote(p.draft).minutes)} + ${BUFFER} min buffer<br>Price ${money(p.oldTotal)} → <strong>${money(p.total)}</strong></p>${p.total !== p.oldTotal ? '<div class="notice warning">The visit price changes with the service date. The customer must accept the new total.</div>' : ''}</div>`; }).join('')}
     ${plan.unresolved.map(p => `<div class="notice warning">${icon('alert')}<span>${esc(bookings.find(b => b.id === p.id)?.draft.name)}: ${esc(p.reason)}.</span></div>`).join('')}
     ${plan.proposals.length ? '<button class="btn full" style="margin-top:20px" data-action="approve-rain">Send demo change requests</button><p class="owner-help">This also pauses new bookings on the rain day. Both original appointments and proposed holds are protected until each customer responds.</p>' : '<p class="notice warning">No changes can be proposed. The calendar is unchanged.</p>'}`;
 }

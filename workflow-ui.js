@@ -1,6 +1,6 @@
-import {SERVICES,DEMO_DATES,defaultDraft,quote,money,duration,dateLabel,time,slots} from './model.js?v=field-day-8';
-import {DEFAULT_RULES,getRules,publishRules,visibleQuestions,validateRules} from './rules.js?v=field-day-8';
-import * as domain from './workflow-model.js?v=field-day-8';
+import {SERVICES,DEMO_DATES,freshPromotion,defaultDraft,quote,money,duration,dateLabel,time,slots} from './model.js?v=combined-10';
+import {DEFAULT_RULES,getRules,publishRules,visibleQuestions,validateRules} from './rules.js?v=combined-10';
+import * as domain from './workflow-model.js?v=combined-10';
 export const WORK_STORE='business-hq-workflows-v3',RULE_STORE='business-hq-rules-v3';
 export function loadPublished(){try{const saved=localStorage.getItem(RULE_STORE);if(saved)publishRules(JSON.parse(saved));}catch{ /* Use the standard catalog when saved rules cannot be loaded. */ }}
 export function createWorkflows(ctx){
@@ -96,7 +96,7 @@ export function createWorkflows(ctx){
       if(action==='wf-pause-plan'){commit(domain.pauseRepeat(work,ctx.getBookings(),id));ctx.announce('Repeat plan paused. Eligible unstarted visits were released.');}
       if(action==='wf-seasonal'){if(!work.seasonal.some(s=>s.bookingId===id)){work.seasonal.push({id:domain.uid('SEA'),bookingId:id,active:true});save();}ctx.navigate('bookings');ctx.announce('Seasonal reminder saved in this browser.');return true;}
       if(action==='wf-toggle-seasonal'){const s=work.seasonal.find(s=>s.id===id);s.active=!s.active;save();}
-      if(action==='wf-rebook-seasonal'){const draft={...structuredClone(b.draft),catalogSnapshot:getRules(),date:'2027-10-28',start:null,extraWork:[],approvedOffer:undefined};ctx.startDraft(draft,0);return true;}
+      if(action==='wf-rebook-seasonal'){const draft={...structuredClone(b.draft),catalogSnapshot:getRules(),promotionSnapshot:freshPromotion(),date:'2027-10-28',start:null,extraWork:[],approvedOffer:undefined};ctx.startDraft(draft,0);return true;}
       ctx.render();return true;
     }catch(err){ctx.error(err.message);ctx.render();return true;}
   }

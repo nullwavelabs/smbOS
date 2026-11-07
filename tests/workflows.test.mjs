@@ -1,22 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DEFAULT_RULES,getRules,publishRules,visibleQuestions} from '../rules.js?v=field-day-8';
-import {defaultDraft,quote,slots,validBooking} from '../model.js?v=field-day-8';
-import {sampleDay} from '../operations.js?v=field-day-8';
+import {DEFAULT_RULES,getRules,publishRules,visibleQuestions} from '../rules.js?v=combined-10';
+import {defaultDraft,quote,slots,validBooking} from '../model.js?v=combined-10';
+import {sampleDay} from '../operations.js?v=combined-10';
 import * as w from '../workflow-model.js';
 
 test('conditional answers affect price, time and preparation only while visible',()=>{
  const d={...defaultDraft(),size:'small',answers:{leaves:{debris:'yes',rearAccess:'difficult'}}};
- assert.equal(quote(d).total,248);assert.equal(quote(d).minutes,120);assert.ok(quote(d).tools.includes('Small transport cart'));
- d.answers.leaves.debris='no';assert.equal(visibleQuestions('leaves',d).length,1);assert.equal(quote(d).total,198);assert.equal(quote(d).minutes,90);assert.ok(!quote(d).tools.includes('Small transport cart'));
+ assert.equal(quote(d).total,218);assert.equal(quote(d).minutes,120);assert.ok(quote(d).tools.includes('Small transport cart'));
+ d.answers.leaves.debris='no';assert.equal(visibleQuestions('leaves',d).length,1);assert.equal(quote(d).total,175.5);assert.equal(quote(d).minutes,90);assert.ok(!quote(d).tools.includes('Small transport cart'));
 });
 test('published changes apply to new drafts, never snapshots of agreed scope',()=>{
  const old=defaultDraft(),config=getRules();config.leaves.base=180;publishRules(config);
- try{assert.equal(quote(defaultDraft()).total,303);assert.equal(quote(old).total,273);}finally{publishRules(DEFAULT_RULES);}
+ try{assert.equal(quote(defaultDraft()).total,264.75);assert.equal(quote(old).total,239.25);}finally{publishRules(DEFAULT_RULES);}
 });
 test('multiple services share one travel charge and sum duration and rules',()=>{
  const d={...defaultDraft(),size:'small',services:['leaves','mowing'],answers:{leaves:{debris:'yes'}}};
- const q=quote(d);assert.equal(q.total,268);assert.equal(q.minutes,150);assert.equal(q.travel,48);assert.equal(q.tools.filter(t=>t==='Leaf blower').length,1);
+ const q=quote(d);assert.equal(q.total,241);assert.equal(q.minutes,150);assert.equal(q.travel,48);assert.equal(q.tools.filter(t=>t==='Leaf blower').length,1);
 });
 test('invalid studio rules and missing conditional answers are rejected',()=>{
  const config=getRules();config.leaves.questions[0].when='rearAccess';assert.throws(()=>publishRules(config),/earlier/);
@@ -44,7 +44,7 @@ test('extra work changes nothing until approval, then updates one visit and its 
 test('declining extra work preserves price and duration; a conflicting extension cannot be accepted',()=>{
  const visits=sampleDay(),work=w.proposeExtra(w.freshWork(),visits,visits[0].id,'More debris',20,15,'Rake');
  assert.throws(()=>w.respondExtra(work,visits,work.extras[0].id,true),/conflicts/);
- const r=w.respondExtra(work,visits,work.extras[0].id,false);assert.equal(r.bookings[0].total,198);assert.equal(r.bookings[0].minutes,90);assert.equal(r.work.extras[0].status,'declined');
+ const r=w.respondExtra(work,visits,work.extras[0].id,false);assert.equal(r.bookings[0].total,175.5);assert.equal(r.bookings[0].minutes,90);assert.equal(r.work.extras[0].status,'declined');
 });
 test('pending extra work blocks completion and completion creates an unpaid invoice',()=>{
  const visits=sampleDay(),work=w.proposeExtra(w.freshWork(),visits,visits[1].id,'Downspout',25,15,'Brush');
@@ -54,13 +54,13 @@ test('pending extra work blocks completion and completion creates an unpaid invo
 });
 test('partial, full and excess payments remain separate from job status',()=>{
  const visits=sampleDay(),work=w.freshWork(),invoice=w.invoiceFor(work,visits[0]);
- let paid=w.recordPayment(work,invoice.id,50,'cash');assert.equal(w.balance(paid.invoices[0]),148);assert.equal(visits[0].status,'confirmed');
- assert.throws(()=>w.recordPayment(paid,invoice.id,149,'demo'),/exceeds/);
- paid=w.recordPayment(paid,invoice.id,148,'demo');assert.equal(w.balance(paid.invoices[0]),0);assert.throws(()=>w.recordPayment(paid,invoice.id,1,'demo'),/exceeds/);
+ let paid=w.recordPayment(work,invoice.id,50,'cash');assert.equal(w.balance(paid.invoices[0]),125.5);assert.equal(visits[0].status,'confirmed');
+ assert.throws(()=>w.recordPayment(paid,invoice.id,126.5,'demo'),/exceeds/);
+ paid=w.recordPayment(paid,invoice.id,125.5,'demo');assert.equal(w.balance(paid.invoices[0]),0);assert.throws(()=>w.recordPayment(paid,invoice.id,1,'demo'),/exceeds/);
 });
 test('a repeat plan previews date-specific prices, then explicitly reserves three conflict-free visits',()=>{
  const visits=sampleDay(),p=w.repeatPreview(visits,visits[1].id,'weekly');assert.equal(p.visits.length,3);assert.equal(visits.length,2);
- assert.equal(p.visits[0].total,168);const r=w.confirmRepeat(w.freshWork(),visits,p);assert.equal(r.bookings.length,5);assert.equal(r.work.plans.length,1);
+ assert.equal(p.visits[0].total,156);const r=w.confirmRepeat(w.freshWork(),visits,p);assert.equal(r.bookings.length,5);assert.equal(r.work.plans.length,1);
  for(const b of r.bookings)assert.equal(validBooking(b.draft,r.bookings,b.id),'');
  const paused=w.pauseRepeat(r.work,r.bookings,r.work.plans[0].id);assert.equal(paused.bookings.filter(b=>b.status==='cancelled').length,3);assert.equal(paused.bookings[1].status,'confirmed');
 });
@@ -77,9 +77,9 @@ test('a changed scope cannot use an earlier agreed quote',()=>{
 });
 test('new repeat plans use newly published rules and agreed plans retain snapshots',()=>{
  const visits=sampleDay(),config=getRules();config.leaves.base=180;publishRules(config);
- try{const p=w.repeatPreview(visits,visits[0].id,'weekly');assert.equal(p.visits[0].total,228);assert.equal(visits[0].total,198);}finally{publishRules(DEFAULT_RULES);}
+ try{const p=w.repeatPreview(visits,visits[0].id,'weekly');assert.equal(p.visits[0].total,201);assert.equal(visits[0].total,175.5);}finally{publishRules(DEFAULT_RULES);}
 });
 test('fractional demo payments are rounded consistently to cents',()=>{
  const work=w.freshWork(),invoice=w.invoiceFor(work,sampleDay()[0]);const paid=w.recordPayment(work,invoice.id,10.125,'demo');
- assert.equal(paid.invoices[0].payments[0].amount,10.13);assert.equal(w.balance(paid.invoices[0]),187.87);
+ assert.equal(paid.invoices[0].payments[0].amount,10.13);assert.equal(w.balance(paid.invoices[0]),165.37);
 });
