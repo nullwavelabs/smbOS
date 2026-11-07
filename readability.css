@@ -78,7 +78,7 @@ label,.label{color:#374f3c}input,select,textarea{font-size:16px;line-height:1.5;
 .req{color:#a4462c;margin-left:3px;font-weight:700}
 @media(max-width:620px){.section-toggle{padding:16px}.section-body{padding:0 16px 18px}}
 .preselected{border-style:dashed!important;border-color:var(--green)!important;background:#f6f9f3}.preselected-tag{display:inline-block;margin-top:6px;padding:2px 9px;border-radius:999px;background:#e3ecdd;color:var(--green);font-size:12px;font-weight:700}.choice .preselected-tag{display:block;width:max-content;margin:6px auto 0;font-size:11px}
-.step-section.locked{opacity:.55}.step-section.locked .section-toggle{cursor:not-allowed}.section-done{margin-top:16px;width:100%}.section-done:disabled{opacity:.45;cursor:not-allowed}.section-done svg{width:16px;height:16px}
+.step-section.locked{opacity:.55}.step-section.locked .section-toggle{cursor:not-allowed}.section-done{margin-top:16px;width:100%}.section-done.incomplete{opacity:.6}.section-done svg{width:16px;height:16px}
 main .panel,.summary [data-action="next"]{scroll-margin-top:130px}
 
 /* Panel completion animation: check pops and draws, the panel folds, the next panel opens */
@@ -117,3 +117,16 @@ main:has(.home-continue){padding-bottom:130px}
 .property-edit{display:block;width:max-content;margin-top:8px;font-size:14px;padding:0}
 .property-editor{margin-top:-2px;padding:16px;border:1px solid #c9d4c3;border-radius:12px;background:#fbfcf9}.property-editor h4{margin:0 0 4px;font-size:16px}.property-editor .btn-row{margin-top:14px;align-items:center}
 .property-access-note{display:block;margin-top:6px;font-size:13px;line-height:1.5;font-style:italic;color:#4d6352;font-synthesis:style}.property-access-note b{font-style:normal;font-weight:700}
+
+/* Visit questions: answer cards that match the yard-size and leaf choices */
+.question-choices{flex-wrap:wrap}.question-choices .choice{position:relative;flex:1 1 150px;min-width:0;margin:0;cursor:pointer;font-weight:400;color:inherit}
+.question-choices input{position:absolute;width:1px;height:1px;min-height:0;margin:0;padding:0;opacity:0}
+.question-choices .choice:has(input:focus-visible),.choice:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+/* Pressing Done or Continue early: a soft yellow marks what is still required */
+[data-need],.section-done{scroll-margin-top:130px}
+.needs-answer{background:#fdf6d8;box-shadow:0 0 0 8px #fdf6d8;border-radius:4px;transition:background .2s ease,box-shadow .2s ease}
+.needs-answer input:not([type=radio]):not([type=checkbox]),.needs-answer textarea{border-color:#d4b94f}
+.section-done.needs-answer{background:var(--green);box-shadow:0 0 0 4px #f0dc8c}
+.section-missing{margin:16px 0 0;font-size:14px;font-weight:600;line-height:1.5;color:#6b5a14}.section-missing+.section-done{margin-top:10px}
+@media(prefers-reduced-motion:reduce){.needs-answer{transition:none}}

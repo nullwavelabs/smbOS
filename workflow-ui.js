@@ -19,7 +19,14 @@ export function createWorkflows(ctx){
     const config=draft.catalogSnapshot??getRules();
     return draft.services.map(id=>{const qs=visibleQuestions(id,draft,config);return qs.length?`<section class="panel wf-questions"><div class="eyebrow">${e(SERVICES[id].name)} · VISIT DETAILS</div>${qs.map(q=>{
       const open=q.type==='select'&&unanswered(id,q.key),value=open?'':draft.answers?.[id]?.[q.key]??q.default??'',attrs=`data-wf="${where}" data-service-id="${id}" data-question="${e(q.key)}"`,inputId=`${where}-${id}-${q.key}`;
-      return `<div class="field"><label for="${e(inputId)}">${e(q.label)} ${q.required?'<span class="wf-required">Required</span>':''}</label>${q.type==='select'?`<select id="${e(inputId)}" ${attrs}>${open?'<option value="" selected disabled>Choose…</option>':''}${choices(q.options,value)}</select>`:`<input id="${e(inputId)}" type="${q.type==='number'?'number':'text'}" value="${e(value)}" maxlength="160" ${attrs}>`}${!open&&String(value)===String(q.equals)?`<span class="wf-effect">${q.price?`+${money(q.price)} · `:''}${q.minutes?`+${q.minutes} min · `:''}${e(q.prep||'Standard preparation')}${q.review?' · Owner review required':''}</span>`:''}</div>`;
+      const required=q.required?'<span class="wf-required">Required</span>':'';
+      if(q.type==='select'){
+        const cost=[q.price?`+${money(q.price)}`:'',q.minutes?`adds ${q.minutes} min`:'',q.review?'Owner review':''].filter(Boolean).join(' · ');
+        const card=(option,i)=>{const on=!open&&String(option)===String(value),text=String(option),optionId=`${inputId}-${i}`,note=!cost?'':text===String(q.equals)?cost:'Included';return `<label class="choice${on?' selected':''}" for="${e(optionId)}"><input type="radio" id="${e(optionId)}" name="${e(inputId)}" value="${e(option)}" ${attrs}${on?' checked':''}><strong>${e(text.charAt(0).toUpperCase()+text.slice(1))}</strong>${note?`<small>${e(note)}</small>`:''}</label>`;};
+        const prep=q.prep&&!open&&String(value)===String(q.equals)?`<span class="wf-effect">Joe’s prep: ${e(q.prep)}</span>`:'';
+        return `<div class="field" data-need="q:${id}:${e(q.key)}"><span class="label" id="${e(inputId)}-label">${e(q.label)} ${required}</span><div class="choice-row question-choices" role="radiogroup" aria-labelledby="${e(inputId)}-label">${q.options.map(card).join('')}</div>${prep}</div>`;
+      }
+      return `<div class="field" data-need="q:${id}:${e(q.key)}"><label for="${e(inputId)}">${e(q.label)} ${required}</label><input id="${e(inputId)}" type="${q.type==='number'?'number':'text'}" value="${e(value)}" maxlength="160" ${attrs}>${String(value)===String(q.equals)?`<span class="wf-effect">${q.price?`+${money(q.price)} · `:''}${q.minutes?`+${q.minutes} min · `:''}${e(q.prep||'Standard preparation')}${q.review?' · Owner review required':''}</span>`:''}</div>`;
     }).join('')}</section>`:'';}).join('');
   }
   function studio(){

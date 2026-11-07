@@ -6,6 +6,8 @@ This release brings over the rest of Derek's November 1, 2026 working copy (`joe
 
 - Multi-select service cards with a Continue bar, category chips, and search.
 - Locked, collapsing booking sections with Preselected states and required-field markers.
+- Tap-card answers for visit questions and home stories, replacing dropdowns.
+- Guidance through required fields: each selection glides to the next required input, and Done or Continue highlights what is missing in soft yellow and returns to it.
 - Saved-property picker, in-place editing, and new properties with city and state (`areaForCity`).
 - Access answers that wait for owner confirmation (`accessAnswered`), plus the owner access checkbox in the older day and Jobs & money views.
 

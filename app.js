@@ -156,8 +156,8 @@ function applyServiceFilter() {
 function stepper() { return `<div class="stepper" aria-label="Booking progress">${['Your visit', 'Find a time', 'Review & book'].map((name, i) => `${i ? '<span class="step-line"></span>' : ''}<div class="step ${i === stage ? 'active' : i < stage ? 'done' : ''}" ${i === stage ? 'aria-current="step"' : ''}><b>${i < stage ? '✓' : i + 1}</b>${name}</div>`).join('')}</div>`; }
 // Booking sections collapse once their required fields are complete, with a green check. Tap the header to reopen.
 // Prefilled choices are only suggestions: a section counts as complete after the customer taps to confirm it.
-let sectionOpen = {}, sectionDone = {}, sectionLocked = {}, sectionDraft = null, confirmed = {};
-function sectionState() { if (sectionDraft !== draft) { sectionDraft = draft; sectionOpen = {}; sectionDone = {}; sectionLocked = {}; confirmed = {}; } }
+let sectionOpen = {}, sectionDone = {}, sectionLocked = {}, sectionDraft = null, confirmed = {}, showMissing = {};
+function sectionState() { if (sectionDraft !== draft) { sectionDraft = draft; sectionOpen = {}; sectionDone = {}; sectionLocked = {}; confirmed = {}; showMissing = {}; } }
 function confirmChoices(...ids) { sectionState(); ids.forEach(id => { confirmed[id] = true; }); }
 const req = '<span class="req" aria-hidden="true">*</span>';
 const placeComplete = () => Boolean(draft.property?.trim() && draft.city?.trim() && draft.state?.trim() && quote(draft).serviceable);
@@ -166,7 +166,7 @@ const contactComplete = () => Boolean(draft.name.trim() && /^[^\s@]+@[^\s@]+\.[^
 // "A few details" always ends with Done: every service adds at least one visit question from the workflow rules.
 const detailsAnswered = () => (!draft.services.some(s => s === 'leaves' || s === 'mowing') || Boolean(confirmed.size)) && (!draft.services.includes('leaves') || Boolean(confirmed.haul)) && (!draft.services.includes('gutters') || Boolean(confirmed.stories))
   && draft.services.every(id => visibleQuestions(id, draft).every(q => q.type !== 'select' || confirmed[`q:${id}:${q.key}`])) && !quote(draft).missing.length;
-// Joe's visit questions start on "Choose…" until the customer answers them, instead of showing the default.
+// Joe's visit questions start with no card selected until the customer answers them, instead of showing the default.
 const askQuestions = d => wf.questions(d, 'answer', (id, key) => !confirmed[`q:${id}:${key}`]);
 function sectionComplete(id) {
   sectionState();
@@ -181,32 +181,81 @@ function sectionComplete(id) {
 const preselected = '<span class="preselected-tag">Preselected · tap to confirm</span>';
 // Panels open in order: each stays locked until every panel above it in this step is complete.
 const SECTION_ORDER = [['place', 'services', 'details', 'quote'], ['time', 'contact']];
-const doneButton = (id, enabled) => `<button class="btn small section-done" data-action="section-done" data-id="${id}"${enabled ? '' : ' disabled'}>Done ${icon('check')}</button>`;
+const missingText = ready => ready ? 'All answered. Tap Done to continue.' : 'Finish the highlighted items to continue.';
+const doneButton = id => { const ready = doneReady(id); return `${showMissing[id] ? `<p class="section-missing" role="status">${missingText(ready)}</p>` : ''}<button class="btn small section-done${ready ? '' : ' incomplete'}" data-action="section-done" data-id="${id}">Done ${icon('check')}</button>`; };
+// A panel's Done stays pressable: pressing it early highlights what is still needed instead of doing nothing.
+function doneReady(id) {
+  if (id === 'place') return Boolean(confirmed.picked) && placeComplete();
+  if (id === 'services') return Boolean(confirmed.picked_services) && draft.services.length > 0;
+  if (id === 'details') return detailsAnswered();
+  if (id === 'time') return draft.start !== null;
+  return contactComplete();
+}
+// What a panel still needs from the customer, top to bottom. Keys match the data-need attributes in its markup.
+function missingItems(id) {
+  if (id === 'place') {
+    if (draft.propertyId !== 'new') return confirmed.picked && placeComplete() ? [] : ['place'];
+    if (!confirmed.picked) return ['place'];
+    return [!draft.property?.trim() && 'property', (!draft.city?.trim() || !quote(draft).serviceable) && 'city', !draft.state?.trim() && 'state'].filter(Boolean);
+  }
+  if (id === 'services') return doneReady('services') ? [] : ['services'];
+  if (id === 'time') return draft.start === null ? ['time'] : [];
+  if (id === 'details') {
+    const list = [draft.services.some(s => s === 'leaves' || s === 'mowing') && !confirmed.size && 'size', draft.services.includes('leaves') && !confirmed.haul && 'haul', draft.services.includes('gutters') && !confirmed.stories && 'stories'].filter(Boolean);
+    for (const service of draft.services) for (const q of visibleQuestions(service, draft)) {
+      const answer = String(draft.answers?.[service]?.[q.key] ?? q.default ?? '').trim();
+      if (q.type === 'select' ? !confirmed[`q:${service}:${q.key}`] : q.required && !answer) list.push(`q:${service}:${q.key}`);
+    }
+    return list;
+  }
+  return [!draft.name.trim() && 'name', !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email) && 'email', draft.phone.replace(/\D/g, '').length < 10 && 'phone'].filter(Boolean);
+}
+const needEl = key => [...document.querySelectorAll('[data-need]')].find(el => el.dataset.need === key);
+// Runs after every render and while typing, so a highlight clears as soon as its answer is in.
+function applyNeeds() {
+  document.querySelectorAll('.needs-answer').forEach(el => el.classList.remove('needs-answer'));
+  for (const id of Object.keys(showMissing)) if (document.querySelector(`.step-section[data-section="${id}"]`)) missingItems(id).forEach(key => needEl(key)?.classList.add('needs-answer'));
+  document.querySelectorAll('.section-done[data-id]').forEach(button => { const ready = doneReady(button.dataset.id); button.classList.toggle('incomplete', !ready); const hint = button.previousElementSibling; if (hint?.classList.contains('section-missing')) hint.textContent = missingText(ready); if (showMissing[button.dataset.id] && ready) button.classList.add('needs-answer'); });
+}
+// Lands an element just below the sticky header.
+const headerOffset = () => (document.querySelector('.topbar')?.getBoundingClientRect().height ?? 116) + 12;
+function snapTo(el, ms = 450) { glideTo(scrollY + el.getBoundingClientRect().top - headerOffset(), ms); }
+// With nothing left to answer, the visit summary is next: its heading lands just below the header, never scrolled past.
+function snapToSummary(ms) { const summary = document.querySelector('.booking-layout > .summary'); if (summary && getComputedStyle(summary).position !== 'fixed' && summary.offsetHeight) { snapTo(summary, ms); return true; } return false; }
+function snapToNeed(id) {
+  const key = missingItems(id)[0], target = (key && needEl(key)) ?? document.querySelector(`.section-done[data-id="${id}"]`) ?? document.querySelector(`.step-section[data-section="${id}"]`);
+  if (target) snapTo(target);
+}
+const firstOpenSection = () => (SECTION_ORDER[stage] ?? []).find(id => document.querySelector(`.step-section[data-section="${id}"]`) && !sectionComplete(id));
+// After a selection: glide to the next thing the customer has to do. Editing a finished panel stays put.
+function snapNext(current) { if (current && sectionComplete(current)) return; const id = firstOpenSection(); if (id) snapToNeed(id); else snapToSummary(); }
+// Pressing Done or Continue early: show what is missing and take the customer to it.
+function showWhatsMissing(id) { showMissing[id] = true; render(); snapToNeed(id); }
 // After a panel completes: the check pops in, the next panel opens, then the finished one folds, then the page glides to the new one.
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-let justDone = null, advanceFrom = null;
+let justDone = null, advanceFrom = null, glideRun = 0;
 function advance(id) { advanceFrom = id; const order = SECTION_ORDER.find(list => list.includes(id)) ?? [], next = order[order.indexOf(id) + 1]; if (next) sectionOpen[next] = true; }
 function glideTo(y, ms = 650) {
-  const start = scrollY, distance = Math.max(0, y) - start, began = performance.now();
+  const start = scrollY, distance = Math.max(0, y) - start, began = performance.now(), run = ++glideRun;
   if (reducedMotion() || Math.abs(distance) < 2) return scrollTo(0, start + distance);
   const ease = t => t < .5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
-  const step = now => { const t = Math.min(1, (now - began) / ms); scrollTo(0, start + distance * ease(t)); if (t < 1) requestAnimationFrame(step); };
+  const step = now => { if (run !== glideRun) return; const t = Math.min(1, (now - began) / ms); scrollTo(0, start + distance * ease(t)); if (t < 1) requestAnimationFrame(step); };
   requestAnimationFrame(step);
 }
 function snapAfter(id) {
   let next = document.querySelector(`.step-section[data-section="${id}"]`)?.nextElementSibling;
   while (next && (next.classList.contains('collapsed') || !next.offsetHeight)) next = next.nextElementSibling;
-  const target = next ?? document.querySelector('.summary [data-action="next"]');
-  if (!target) return;
-  const box = target.getBoundingClientRect(), margin = parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
-  glideTo(scrollY + (next ? box.top - margin : box.top - (innerHeight - box.height) / 2));
+  if (next) return snapTo(next, 650);
+  if (snapToSummary(650)) return;
+  const button = document.querySelector('.summary [data-action="next"]');
+  if (button) { const box = button.getBoundingClientRect(); glideTo(scrollY + box.top - (innerHeight - box.height) / 2); }
 }
 // Called before the re-render with the old panel heights and the finished panel's old contents.
 function animateSections(id, heights, oldBody) {
   if (reducedMotion()) return snapAfter(id);
   // Bring the finished panel's header (and its check) into view first; it stays put while the panel folds.
   const done = document.querySelector(`.step-section[data-section="${id}"]`);
-  if (done) { const top = done.getBoundingClientRect().top, margin = parseFloat(getComputedStyle(done).scrollMarginTop) || 0; if (top < margin || top > innerHeight * .6) glideTo(scrollY + top - margin, 420); }
+  if (done) { const top = done.getBoundingClientRect().top, margin = parseFloat(getComputedStyle(done).scrollMarginTop) || 0; if (top < margin || top > innerHeight * .6) snapTo(done, 420); }
   const moving = [...document.querySelectorAll('.step-section[data-section]')].map(el => ({ el, from: heights[el.dataset.section], to: el.offsetHeight })).filter(m => m.from && m.from !== m.to);
   // With a panel to open, it opens first and the finished one folds after; otherwise the fold starts right after the check.
   const opening = moving.some(m => m.el.dataset.section !== id), foldAt = opening ? 1000 : 450;
@@ -256,29 +305,29 @@ function scope() {
   const servicesSummary = draft.services.map(id => esc(SERVICES[id].name)).join(' + ');
   const detailsSummary = [hasYard ? `${draft.size[0].toUpperCase()}${draft.size.slice(1)} yard` : '', draft.services.includes('leaves') && confirmed.haul ? draft.haul ? 'haul-away' : 'bagged at the curb' : '', draft.services.includes('gutters') ? `${draft.stories} ${Number(draft.stories) === 1 ? 'story' : 'stories'}` : ''].filter(Boolean).join(' · ') || 'Nothing else needed';
   return `${section('place', 'pin', 'First, where are we headed?', placeSummary, `<p>Choose one of your saved properties, or add a new one. All details here are fictional.</p>
-  <div class="property-picker" role="radiogroup" aria-label="Your properties">${props.map(p => option(p.id, esc(p.label), esc([p.address, p.city, p.state].filter(Boolean).join(', ')), 'house', esc(p.access ?? '')) + (editingProperty?.id === p.id ? propertyEditor(p) : '')).join('')}${option('new', 'Add a new property', 'We’ll save it to your account for next time', 'plus')}</div>
-  <div class="fields">${draft.propertyId === 'new' ? `<div class="field wide"><label for="property">Street address${req}</label><input id="property" required data-field="property" value="${esc(draft.property)}" maxlength="80" autocomplete="address-line1"></div><div class="field"><label for="city">City${req}</label><input id="city" required data-field="city" value="${esc(draft.city ?? '')}" maxlength="40" list="served-cities" autocomplete="address-level2"><datalist id="served-cities">${Object.values(AREAS).filter(a => a.miles !== null).map(a => `<option value="${a.name}">`).join('')}</datalist></div><div class="field"><label for="state">State${req}</label><input id="state" required data-field="state" value="${esc(draft.state ?? '')}" maxlength="2" autocomplete="address-level1" style="text-transform:uppercase"></div>` : ''}
+  <div class="property-picker" data-need="place" role="radiogroup" aria-label="Your properties">${props.map(p => option(p.id, esc(p.label), esc([p.address, p.city, p.state].filter(Boolean).join(', ')), 'house', esc(p.access ?? '')) + (editingProperty?.id === p.id ? propertyEditor(p) : '')).join('')}${option('new', 'Add a new property', 'We’ll save it to your account for next time', 'plus')}</div>
+  <div class="fields">${draft.propertyId === 'new' ? `<div data-need="property" class="field wide"><label for="property">Street address${req}</label><input id="property" required data-field="property" value="${esc(draft.property)}" maxlength="80" autocomplete="address-line1"></div><div data-need="city" class="field"><label for="city">City${req}</label><input id="city" required data-field="city" value="${esc(draft.city ?? '')}" maxlength="40" list="served-cities" autocomplete="address-level2"><datalist id="served-cities">${Object.values(AREAS).filter(a => a.miles !== null).map(a => `<option value="${a.name}">`).join('')}</datalist></div><div data-need="state" class="field"><label for="state">State${req}</label><input id="state" required data-field="state" value="${esc(draft.state ?? '')}" maxlength="2" autocomplete="address-level1" style="text-transform:uppercase"></div>` : ''}
   <div class="field wide"><div class="property-distance ${q.serviceable ? '' : 'outside'}">${icon('car')}<span>${q.serviceable ? `<strong>${area.miles} miles from Joe</strong><small>${area.name} · ${money(q.travel)} round-trip travel, included in your total</small>` : `<strong>${draft.city?.trim() ? 'Outside Joe’s service area' : 'Enter a city to see the distance'}</strong><small>Joe serves ${Object.values(AREAS).filter(a => a.miles !== null).map(a => a.name).join(' and ')}, RI.</small>`}</span></div></div>
-  ${draft.propertyId === 'new' ? `<div class="field wide"><label for="property-access">Access instructions</label><textarea id="property-access" data-field="access" maxlength="300" placeholder="e.g. Use the right side gate to enter the back yard">${esc(draft.access || draft.notes || '')}</textarea><span class="hint">Joe confirms these when he accepts the job.</span></div>` : ''}</div>${draft.propertyId === 'new' ? doneButton('place', Boolean(confirmed.picked) && placeComplete()) : ''}`)}
-  ${section('services', 'bag', 'Choose your services', servicesSummary, `<p>Select everything you need. The questions for your visit appear below.</p>${Object.entries(SERVICES).map(([id,s]) => { const on = draft.services.includes(id), pre = on && !confirmed.picked_services; return `<label class="addon ${on ? pre ? 'preselected' : 'selected' : ''}" for="add-${id}"><span class="service-icon ${s.icon}">${icon(s.icon)}</span><span><h3>${s.name}</h3><p>${FALL_PROMO.rates[id] ? `${Math.round(FALL_PROMO.rates[id] * 100)}% off fall visits (Sep–Nov)` : `${money((draft.catalogSnapshot??getRules())[id].base)} starting price · scope adjusts total`}</p>${pre ? preselected : ''}</span><input type="checkbox" id="add-${id}" data-service="${id}"${checked(on && !pre)}></label>`; }).join('')}${doneButton('services', Boolean(confirmed.picked_services) && draft.services.length > 0)}`)}
+  ${draft.propertyId === 'new' ? `<div class="field wide"><label for="property-access">Access instructions</label><textarea id="property-access" data-field="access" maxlength="300" placeholder="e.g. Use the right side gate to enter the back yard">${esc(draft.access || draft.notes || '')}</textarea><span class="hint">Joe confirms these when he accepts the job.</span></div>` : ''}</div>${draft.propertyId === 'new' ? doneButton('place') : ''}`)}
+  ${section('services', 'bag', 'Choose your services', servicesSummary, `<p>Select everything you need. The questions for your visit appear below.</p><div data-need="services">${Object.entries(SERVICES).map(([id,s]) => { const on = draft.services.includes(id), pre = on && !confirmed.picked_services; return `<label class="addon ${on ? pre ? 'preselected' : 'selected' : ''}" for="add-${id}"><span class="service-icon ${s.icon}">${icon(s.icon)}</span><span><h3>${s.name}</h3><p>${FALL_PROMO.rates[id] ? `${Math.round(FALL_PROMO.rates[id] * 100)}% off fall visits (Sep–Nov)` : `${money((draft.catalogSnapshot??getRules())[id].base)} starting price · scope adjusts total`}</p>${pre ? preselected : ''}</span><input type="checkbox" id="add-${id}" data-service="${id}"${checked(on && !pre)}></label>`; }).join('')}</div>${doneButton('services')}`)}
   ${section('details', 'leaf', 'A few details. A clear price.', detailsSummary, `<p>Tell Joe what to expect, and your price total updates as you go.</p>
-  ${hasYard ? `<div style="margin-top:20px"><span class="label" id="yard-label">How big is your yard?${req}</span><div class="choice-row" role="group" aria-labelledby="yard-label">${[['small','Small','Under ¼ acre'],['medium','Medium','¼–½ acre'],['large','Large','½–1 acre']].map(([id,n,desc]) => { const on = draft.size === id, pre = on && !confirmed.size; return `<button class="choice ${on ? pre ? 'preselected' : 'selected' : ''}" aria-pressed="${on && !pre}" data-action="size" data-id="${id}"><strong>${n}</strong><small>${desc}</small>${pre ? '<span class="preselected-tag">Preselected</span>' : ''}</button>`; }).join('')}</div><p class="hint" style="margin-top:10px">Over 1 acre or unusually heavy debris? Ask Joe for an assessment before booking.</p></div>` : ''}
-  ${draft.services.includes('leaves') ? `<div style="margin-top:20px"><span class="label" id="haul-label">What should Joe do with the leaves?${req}</span><div class="choice-row two" role="group" aria-labelledby="haul-label">${[['no','Bag them at the curb','Included'],['yes','Take them away','+$35 · adds 15 min']].map(([id,n,desc]) => { const on = confirmed.haul && String(draft.haul) === String(id === 'yes'); return `<button class="choice ${on ? 'selected' : ''}" aria-pressed="${on}" data-action="haul" data-id="${id}"><strong>${n}</strong><small>${desc}</small></button>`; }).join('')}</div></div>` : ''}
-  ${draft.services.includes('gutters') ? `<div class="field" style="margin-top:19px"><label for="stories">How many stories is your home?${req}</label><select id="stories" required data-field="stories">${confirmed.stories ? '' : '<option value="" selected disabled>Choose…</option>'}<option value="1"${selected(confirmed.stories && Number(draft.stories) === 1)}>1 story · base price</option><option value="2"${selected(confirmed.stories && Number(draft.stories) === 2)}>2 stories · +$40 before discount · +30 min</option><option value="3"${selected(confirmed.stories && Number(draft.stories) === 3)}>3 or more · assessment needed</option></select></div>` : ''}
+  ${hasYard ? `<div data-need="size" style="margin-top:20px"><span class="label" id="yard-label">How big is your yard?${req}</span><div class="choice-row" role="group" aria-labelledby="yard-label">${[['small','Small','Under ¼ acre'],['medium','Medium','¼–½ acre'],['large','Large','½–1 acre']].map(([id,n,desc]) => { const on = draft.size === id, pre = on && !confirmed.size; return `<button class="choice ${on ? pre ? 'preselected' : 'selected' : ''}" aria-pressed="${on && !pre}" data-action="size" data-id="${id}"><strong>${n}</strong><small>${desc}</small>${pre ? '<span class="preselected-tag">Preselected</span>' : ''}</button>`; }).join('')}</div><p class="hint" style="margin-top:10px">Over 1 acre or unusually heavy debris? Ask Joe for an assessment before booking.</p></div>` : ''}
+  ${draft.services.includes('leaves') ? `<div data-need="haul" style="margin-top:20px"><span class="label" id="haul-label">What should Joe do with the leaves?${req}</span><div class="choice-row two" role="group" aria-labelledby="haul-label">${[['no','Bag them at the curb','Included'],['yes','Take them away','+$35 · adds 15 min']].map(([id,n,desc]) => { const on = confirmed.haul && String(draft.haul) === String(id === 'yes'); return `<button class="choice ${on ? 'selected' : ''}" aria-pressed="${on}" data-action="haul" data-id="${id}"><strong>${n}</strong><small>${desc}</small></button>`; }).join('')}</div></div>` : ''}
+  ${draft.services.includes('gutters') ? `<div data-need="stories" style="margin-top:20px"><span class="label" id="stories-label">How many stories is your home?${req}</span><div class="choice-row" role="group" aria-labelledby="stories-label">${[[1,'1 story','Base price'],[2,'2 stories','+$40 before discount · adds 30 min'],[3,'3 or more','Assessment needed']].map(([n,name,desc]) => { const on = confirmed.stories && Number(draft.stories) === n; return `<button class="choice ${on ? 'selected' : ''}" aria-pressed="${Boolean(on)}" data-action="stories" data-id="${n}"><strong>${name}</strong><small>${desc}</small></button>`; }).join('')}</div></div>` : ''}
   ${askQuestions(draft).replace(/<section class="panel wf-questions">/g, '<div class="detail-questions">').replace(/<\/section>/g, '</div>').replaceAll('<span class="wf-required">Required</span>', req)}
-  ${doneButton('details', detailsAnswered())}`)}
-${(quote(draft).assessment||quote(draft).minutes+30>240)?section('quote', 'user', 'Where should Joe send the quote?', esc([draft.name, draft.email, draft.phone].join(' · ')), `<p>Fictional details only. No real message is sent.</p><div class="fields"><div class="field wide"><label for="quote-name">Name${req}</label><input id="quote-name" data-field="name" value="${esc(draft.name)}" maxlength="80" required autocomplete="off"></div><div class="field"><label for="quote-email">Email${req}</label><input id="quote-email" type="email" data-field="email" value="${esc(draft.email)}" maxlength="120" required autocomplete="off"></div><div class="field"><label for="quote-phone">Phone${req}</label><input id="quote-phone" type="tel" data-field="phone" value="${esc(draft.phone)}" maxlength="30" required autocomplete="off"></div></div>${doneButton('quote', contactComplete())}`):''}`;
+  ${doneButton('details')}`)}
+${(quote(draft).assessment||quote(draft).minutes+30>240)?section('quote', 'user', 'Where should Joe send the quote?', esc([draft.name, draft.email, draft.phone].join(' · ')), `<p>Fictional details only. No real message is sent.</p><div class="fields"><div data-need="name" class="field wide"><label for="quote-name">Name${req}</label><input id="quote-name" data-field="name" value="${esc(draft.name)}" maxlength="80" required autocomplete="off"></div><div data-need="email" class="field"><label for="quote-email">Email${req}</label><input id="quote-email" type="email" data-field="email" value="${esc(draft.email)}" maxlength="120" required autocomplete="off"></div><div data-need="phone" class="field"><label for="quote-phone">Phone${req}</label><input id="quote-phone" type="tel" data-field="phone" value="${esc(draft.phone)}" maxlength="30" required autocomplete="off"></div></div>${doneButton('quote')}`):''}`;
 }
 function scheduling() {
   const q = quote(draft), available = slots(draft, bookings);
   const timeDone = sectionComplete('time');
   return `${section('time', 'calendar', 'A time that really works.', timeDone ? `${dateLabel(draft.date)} · ${time(draft.start)}–${time(draft.start + q.minutes)}` : '', `<p>Joe works Thursdays, 1–5 PM. Allow 15 minutes for the first drive before arrival. We reserve ${duration(q.minutes)} for your services and ${BUFFER} minutes for travel and setup.</p>
   <strong class="wf-selected-date">Selected date: ${dateLabel(draft.date)}, ${draft.date.slice(0,4)}</strong><div class="date-options" role="group" aria-label="Available Thursdays">${DEMO_DATES.map(date => `<button class="choice date-option ${draft.date === date ? confirmed.date ? 'selected' : 'preselected' : ''}"${blockedDates.includes(date) ? ' disabled title="Paused for rain"' : ''} aria-pressed="${draft.date === date}" data-action="date" data-id="${date}"><span>Thursday</span><b>${date.slice(8)}</b><small>${new Date(date+'T12:00:00Z').toLocaleDateString('en-US',{month:'short',year:'numeric',timeZone:'UTC'})}</small></button>`).join('')}</div>
-  <span class="label">Available start times · Eastern Time${req}</span><div class="slots">${available.map(start => `<button class="choice slot ${draft.start === start ? 'selected' : ''}" aria-pressed="${draft.start === start}" data-action="slot" data-id="${start}"><strong>${time(start)}</strong><small>Finish ${time(start + q.minutes)}</small></button>`).join('')}</div>
+  <span class="label">Available start times · Eastern Time${req}</span><div class="slots" data-need="time">${available.map(start => `<button class="choice slot ${draft.start === start ? 'selected' : ''}" aria-pressed="${draft.start === start}" data-action="slot" data-id="${start}"><strong>${time(start)}</strong><small>Finish ${time(start + q.minutes)}</small></button>`).join('')}</div>
   ${available.length ? `<div class="timing">${icon('shield')}Only slots that fit your whole visit are shown.</div>` : `<div class="notice warning">${icon('clock')}<span>${q.block + BUFFER > 240 ? 'This combination plus travel needs more than Joe’s four-hour work window. Remove a service or request an assessment to split the work.' : 'No time fits your visit on this date. Try another Thursday or adjust your services.'}</span></div>`}
   ${draft.start !== null ? `<div class="notice">${icon('check')}<span>Your services: ${time(draft.start)}–${time(draft.start + q.minutes)}.<br>Calendar protected until ${time(draft.start + q.block)} with the buffer.</span></div>` : ''}
-  ${draft.services.some(id => FALL_PROMO.rates[id]) && !inFallPromo(draft.date) ? '<div class="notice warning">The fall promotion covers September–November visits. Your total shows regular prices for this date.</div>' : ''}${doneButton('time', draft.start !== null)}`)}
-  ${section('contact', 'user', 'Who should Joe expect?', esc([draft.name, draft.email, draft.phone].join(' · ')), `<p>Sample details are filled in for Mary. Use fictional information in this demo.</p><div class="fields"><div class="field wide"><label for="name">Name${req}</label><input id="name" required autocomplete="off" data-field="name" value="${esc(draft.name)}" maxlength="80"></div><div class="field"><label for="email">Email${req}</label><input id="email" required autocomplete="off" type="email" data-field="email" value="${esc(draft.email)}" maxlength="120"></div><div class="field"><label for="phone">Phone${req}</label><input id="phone" required autocomplete="off" type="tel" data-field="phone" value="${esc(draft.phone)}" maxlength="30"></div><div class="field wide"><label for="notes">Anything Joe should know? <span class="hint">Optional</span></label><textarea id="notes" data-field="notes" maxlength="500" placeholder="e.g. I have a dog, but he’s harmless">${esc(draft.notes)}</textarea></div></div>${doneButton('contact', contactComplete())}`)}`;
+  ${draft.services.some(id => FALL_PROMO.rates[id]) && !inFallPromo(draft.date) ? '<div class="notice warning">The fall promotion covers September–November visits. Your total shows regular prices for this date.</div>' : ''}${doneButton('time')}`)}
+  ${section('contact', 'user', 'Who should Joe expect?', esc([draft.name, draft.email, draft.phone].join(' · ')), `<p>Sample details are filled in for Mary. Use fictional information in this demo.</p><div class="fields"><div data-need="name" class="field wide"><label for="name">Name${req}</label><input id="name" required autocomplete="off" data-field="name" value="${esc(draft.name)}" maxlength="80"></div><div data-need="email" class="field"><label for="email">Email${req}</label><input id="email" required autocomplete="off" type="email" data-field="email" value="${esc(draft.email)}" maxlength="120"></div><div data-need="phone" class="field"><label for="phone">Phone${req}</label><input id="phone" required autocomplete="off" type="tel" data-field="phone" value="${esc(draft.phone)}" maxlength="30"></div><div class="field wide"><label for="notes">Anything Joe should know? <span class="hint">Optional</span></label><textarea id="notes" data-field="notes" maxlength="500" placeholder="e.g. I have a dog, but he’s harmless">${esc(draft.notes)}</textarea></div></div>${doneButton('contact')}`)}`;
 }
 function review() {
   const q = quote(draft);
@@ -300,7 +349,7 @@ function bill(q, withAction = false) {
   <div class="summary-detail">${icon('clock')}<span>${duration(q.minutes)} of service<br>+ ${BUFFER} min travel & setup<br>${draft.start !== null ? `${dateLabel(draft.date)} · ${time(draft.start)}` : 'One visit. One travel charge.'}</span></div>
   ${!q.serviceable ? '<div class="error">This property is outside Joe’s service area. Choose a supported demo zone.</div>' : ''}${needsQuote?'<div class="notice warning">Joe needs to review the scope before you can reserve a visit. Request an exact quote below.</div>':''}<div class="wf-prep"><strong>Preparation for this visit</strong><p>${q.tools.map(esc).join(' · ')}</p></div>
   ${error ? `<div class="error" role="alert">${esc(error)}</div>` : ''}
-  ${withAction ? `<button class="btn full" data-action="${needsQuote?'wf-request-quote':'next'}"${unavailable || stage === 1 && draft.start === null ? ' disabled' : ''}>${needsQuote?'Request an owner quote':stage === 0 ? 'Find a time' : stage === 1 ? 'Review my visit' : 'Confirm demo booking'} ${icon(stage === 2 ? 'check' : 'arrow')}</button>${stage > 0 ? '<button class="text-btn" style="margin-top:9px" data-action="previous">← Back a step</button>' : ''}<div class="summary-foot">${stage === 2 ? 'Creates a demo booking in this browser.<br>No card needed. No message is sent.' : 'A clear price, before you commit.<br>Sample dates and fictional properties.'}</div>` : ''}</section></aside>`;
+  ${withAction ? `<button class="btn full" data-action="${needsQuote?'wf-request-quote':'next'}"${unavailable && (stage !== 0 || (sectionComplete('place') && sectionComplete('services'))) ? ' disabled' : ''}>${needsQuote?'Request an owner quote':stage === 0 ? 'Find a time' : stage === 1 ? 'Review my visit' : 'Confirm demo booking'} ${icon(stage === 2 ? 'check' : 'arrow')}</button>${stage > 0 ? '<button class="text-btn" style="margin-top:9px" data-action="previous">← Back a step</button>' : ''}<div class="summary-foot">${stage === 2 ? 'Creates a demo booking in this browser.<br>No card needed. No message is sent.' : 'A clear price, before you commit.<br>Sample dates and fictional properties.'}</div>` : ''}</section></aside>`;
 }
 function booking() { const q=quote(draft),needsQuote=q.assessment||q.minutes+30>240;return `<button class="text-btn back-btn" data-action="${stage?'previous':'home'}">${icon('back')}${stage?'Back a step':'Back to services'}</button><div class="eyebrow">ONE VISIT · ${draft.services.length} SERVICE${draft.services.length===1?'':'S'} · ONE TRAVEL CHARGE</div><h1>${['Let’s plan your visit.','Find your Thursday.','Good to go?'][stage]}</h1>${stepper()}<div class="booking-layout"><div>${stage===0?scope():stage===1?scheduling():review()}</div>${bill(q,true)}</div><div class="mobile-book-strip"><button class="price-trigger" id="mobile-price-trigger" data-action="price-breakdown" aria-haspopup="dialog" aria-label="View price breakdown, total ${money(q.total)}"><small>${needsQuote?'Scope estimate':'Your visit total'}</small><strong>${money(q.total)}</strong><span>View breakdown ${icon('plus')}</span></button><button class="btn" data-action="${needsQuote?'wf-request-quote':'next'}"${!q.serviceable||stage===1&&draft.start===null?' disabled':''}>${needsQuote?'Request quote':stage===2?'Confirm demo booking':'Continue'} ${icon('arrow')}</button></div>`; }
 
@@ -358,6 +407,7 @@ function render() {
   const dates=document.querySelector('.date-options'), selectedDate=dates?.querySelector('.selected');if(dates&&selectedDate)dates.scrollLeft=selectedDate.offsetLeft;
   if (focusMain) { document.querySelector('#main').focus({preventScroll:true}); window.scrollTo({top:0,behavior:'instant'}); focusMain = false; }
   else if (focused) document.getElementById(focused)?.focus({preventScroll:true});
+  applyNeeds();
 }
 function openDialog(value) { dialogReturnId=document.activeElement?.id||null;dialog = value; error = ''; render(); document.querySelector('.dialog button')?.focus(); }
 function encode(value) { const bytes = new TextEncoder().encode(JSON.stringify(value)); return btoa(Array.from(bytes, b => String.fromCharCode(b)).join('')).replaceAll('+','-').replaceAll('/','_').replace(/=+$/, ''); }
@@ -388,7 +438,7 @@ document.addEventListener('click', async event => {
   event.preventDefault();
   const action = button.dataset.action, id = button.dataset.id;
   if(await hq.handle(action,id))return;
-  if (action === 'wf-request-quote' && view === 'book' && stage === 0) { const open = ['place', 'services', 'details', 'quote'].find(id => !sectionComplete(id)); if (open) { error = open === 'quote' ? 'Confirm where Joe should send the quote, then tap Done.' : 'Finish the sections above first.'; render(); document.querySelector('.step-section:not(.done)')?.scrollIntoView({ block: 'center' }); return; } }
+  if (action === 'wf-request-quote' && view === 'book' && stage === 0) { const open = ['place', 'services', 'details', 'quote'].find(id => !sectionComplete(id)); if (open) { error = open === 'quote' ? 'Confirm where Joe should send the quote, then tap Done.' : 'Finish the sections above first.'; showWhatsMissing(open); return; } }
   if(wf.handle(action,id))return;
   if(action==='share-app'){openDialog({type:'share-app'});return;}
   if(action==='price-breakdown'){openDialog({type:'price-breakdown'});return;}
@@ -406,10 +456,11 @@ document.addEventListener('click', async event => {
   if (action === 'repeat-same') return startRepeat(false);
   if (action === 'repeat-edit') return startRepeat(true);
   if (action === 'rebook') return startBooking('leaves', bookings.find(b=>b.id===id)?.draft);
-  if (action === 'haul') { confirmChoices('haul'); draft.haul = id === 'yes'; draft.start = null; error = ''; render(); announce(`Price updated to ${money(quote(draft).total)}`); return; }
-  if (action === 'size') { confirmChoices('size'); draft.size = id; draft.start = null; error = ''; render(); announce(`Price updated to ${money(quote(draft).total)}`); }
-  if (action === 'date') { sectionState(); confirmed.time=false; confirmed.date=true; draft.date=id; draft.start=null; error=''; render(); }
-  if (action === 'pick-property') { useProperty(draft, id === 'new' ? null : myProperties().find(p => p.id === id)); sectionState(); confirmed.picked = true; confirmed.place = id !== 'new'; if (id !== 'new') advance('place'); editingProperty = null; draft.start = null; error = ''; render(); advanceFrom = null; return; }
+  if (action === 'haul') { confirmChoices('haul'); draft.haul = id === 'yes'; draft.start = null; error = ''; render(); announce(`Price updated to ${money(quote(draft).total)}`); snapNext('details'); return; }
+  if (action === 'stories') { confirmChoices('stories'); draft.stories = Number(id); draft.start = null; error = ''; render(); announce(`Price updated to ${money(quote(draft).total)}`); snapNext('details'); return; }
+  if (action === 'size') { confirmChoices('size'); draft.size = id; draft.start = null; error = ''; render(); announce(`Price updated to ${money(quote(draft).total)}`); snapNext('details'); }
+  if (action === 'date') { sectionState(); confirmed.time=false; confirmed.date=true; draft.date=id; draft.start=null; error=''; render(); snapNext('time'); }
+  if (action === 'pick-property') { useProperty(draft, id === 'new' ? null : myProperties().find(p => p.id === id)); sectionState(); confirmed.picked = true; confirmed.place = id !== 'new'; if (id !== 'new') advance('place'); editingProperty = null; draft.start = null; error = ''; render(); if (id === 'new') snapNext('place'); advanceFrom = null; return; }
   if (action === 'edit-property') { const p = myProperties().find(p => p.id === id); editingProperty = p ? { id, address: p.address, city: p.city, state: p.state, access: p.access ?? '' } : null; render(); document.querySelector('#edit-address')?.focus(); return; }
   if (action === 'cancel-property') { editingProperty = null; render(); return; }
   if (action === 'save-property') {
@@ -420,17 +471,17 @@ document.addEventListener('click', async event => {
     propertyEdits[e.id] = { ...propertyEdits[e.id], ...changes }; persistProperties(); editingProperty = null;
     useProperty(draft, myProperties().find(p => p.id === e.id)); sectionState(); confirmed.picked = true; draft.start = null; error = ''; render(); announce('Property updated. Joe will confirm any access changes.'); return;
   }
-  if (action === 'section-done') { confirmChoices(id); advance(id); error = ''; render(); advanceFrom = null; return; }
-  if (action === 'home-continue') { if (!homePick.length) return; const picked = [...homePick]; homePick = []; startBooking(picked[0]); draft.services = picked; confirmChoices('picked_services', 'services'); render(); return; }
+  if (action === 'section-done') { if (!doneReady(id)) { showWhatsMissing(id); announce('Please finish the highlighted items.'); return; } confirmChoices(id); advance(id); error = ''; render(); advanceFrom = null; return; }
+  if (action === 'home-continue') { if (!homePick.length) return; const picked = [...homePick]; homePick = []; startBooking(picked[0]); draft.services = picked; confirmChoices('picked_services', 'services'); render(); snapNext(); return; }
   if (action === 'service-filter') { serviceCategory = id; if (id === 'all') serviceQuery = ''; render(); document.querySelector('.filter-chip.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return; }
   if (action === 'toggle-section') { sectionOpen[id] = !(sectionOpen[id] ?? false); render(); return; }
-  if (action === 'slot') { confirmChoices('date'); draft.start=Number(id); error=''; render(); }
+  if (action === 'slot') { confirmChoices('date'); draft.start=Number(id); error=''; render(); snapNext('time'); }
   if (action === 'edit') { stage=Number(id); error=''; focusMain=true; render(); }
   if (action === 'previous') { stage=Math.max(0,stage-1);error='';focusMain=true;render(); }
   if (action === 'next') {
     error='';
-    if (stage === 0 && !draft.approvedOffer) { const open=['place','services','details'].find(id=>!sectionComplete(id)); if(open){error=open==='place'?'Choose a property, then tap Done.':open==='services'?'Choose at least one service, then tap Done.':'Confirm your yard size and home details.';render();document.querySelector('.step-section:not(.done)')?.scrollIntoView({block:'center'});return;} }
-    if (stage === 1) { const open=['time','contact'].find(id=>!sectionComplete(id)); if(open){error=open==='time'?'Choose a start time, then tap Done.':'Confirm your contact details.';render();document.querySelector('.step-section:not(.done)')?.scrollIntoView({block:'center'});return;} }
+    if (stage === 0 && !draft.approvedOffer) { const open=['place','services','details'].find(id=>!sectionComplete(id)); if(open){error=open==='place'?'Choose a property, then tap Done.':open==='services'?'Choose at least one service, then tap Done.':'Confirm your yard size and home details.';showWhatsMissing(open);return;} }
+    if (stage === 1) { const open=['time','contact'].find(id=>!sectionComplete(id)); if(open){error=open==='time'?'Choose a start time, then tap Done.':'Confirm your contact details.';showWhatsMissing(open);return;} }
     if (stage === 0) { if(quote(draft).missing.length){error='Please answer: '+quote(draft).missing.join(', ');render();return;} if(quote(draft).assessment||quote(draft).minutes+30>240)return; if(!draft.property.trim()){error='Add the street address to continue.';render();return;} if(!quote(draft).serviceable){error='This property is outside Joe’s demo service area.';render();return;} stage=1; focusMain=true; render(); return; }
     const validation=validBooking(draft,bookings);
     if (validation) { error=validation; render(); return; }
@@ -501,18 +552,18 @@ document.addEventListener('click', async event => {
   }
 });
 document.addEventListener('toggle',event=>wf.disclosure(event.target),true);
-document.addEventListener('input',event=>{if(hq.input(event.target))return;if(['edit','question','answer'].includes(event.target.dataset.wf))wf.change(event.target,false);});
+document.addEventListener('input',event=>{if(hq.input(event.target))return;if(['edit','question','answer'].includes(event.target.dataset.wf)){wf.change(event.target,false);applyNeeds();}});
 document.addEventListener('input',event=>{const key=event.target.dataset.editProperty;if(key&&editingProperty){editingProperty[key]=event.target.value;const save=document.querySelector('[data-action="save-property"]');if(save)save.disabled=!propertyReady(editingProperty);}});
 document.addEventListener('input',event=>{if(event.target.matches('[data-service-search]')){serviceQuery=event.target.value;applyServiceFilter();}});
 // Keep a panel's Done button in step with typing; the full re-render waits for the change event.
-document.addEventListener('input',event=>{const el=event.target,field=el.dataset.field;if(!['property','city','state','name','email','phone'].includes(field))return;draft[field]=field==='state'?el.value.trim().toUpperCase():el.value;if(field==='city'||field==='state')draft.area=areaForCity(draft.city,draft.state);const id=['name','email','phone'].includes(field)?(stage===0?'quote':'contact'):'place',button=document.querySelector(`.section-done[data-id="${id}"]`);if(button)button.disabled=!(id==='place'?confirmed.picked&&placeComplete():contactComplete());});
+document.addEventListener('input',event=>{const el=event.target,field=el.dataset.field;if(!['property','city','state','name','email','phone'].includes(field))return;draft[field]=field==='state'?el.value.trim().toUpperCase():el.value;if(field==='city'||field==='state')draft.area=areaForCity(draft.city,draft.state);applyNeeds();});
 // Tapping Done must not blur the field first: the blur's re-render would swallow the tap.
 document.addEventListener('pointerdown',event=>{if(event.target.closest('.section-done'))event.preventDefault();});
 document.addEventListener('change', async event => {
   const el=event.target;
   if(await hq.change(el))return;
   if(el.dataset.wf==='answer')confirmChoices(`q:${el.dataset.serviceId}:${el.dataset.question}`);
-  if(wf.change(el))return;
+  if(wf.change(el)){if(el.dataset.wf==='answer'&&el.type==='radio')snapNext('details');return;}
   if (el.dataset.pack) { packed[`${ownerDate}:${el.dataset.pack}`] = el.checked; persistOperations(); render(); return; }
   if (el.dataset.ownerAccess) { const b = bookings.find(item => item.id === el.dataset.ownerAccess); if (b) { b.draft.accessConfirmed = el.checked; if (b.pendingChange) b.pendingChange.draft.accessConfirmed = el.checked; persist(); } render(); announce(el.checked ? 'Access details confirmed for this job.' : 'Access marked as needing confirmation.'); return; }
   if (el.dataset.recent) { const id = el.dataset.recent, current = recentPick ?? propertyHistory(PROPERTIES[0], bookings).services; recentPick = el.checked ? [...new Set([...current, id])] : current.filter(s => s !== id); render(); return; }
@@ -523,14 +574,13 @@ document.addEventListener('change', async event => {
   if(field==='ownerDate'){ownerDate=el.value;render();return;}
   if(field==='moveDate'){dialog.date=el.value;dialog.start=null;error='';render();return;}
   if(field==='moveTime'){dialog.start=el.value===''?null:Number(el.value);render();return;}
-  draft[field]=el.type==='checkbox'?el.checked:field==='stories'?Number(el.value):el.value;
-  if(field==='stories')confirmChoices('stories');
+  draft[field]=el.type==='checkbox'?el.checked:el.value;
   if(field==='access')draft.accessConfirmed=false;
   if(field==='state')draft.state=draft.state.trim().toUpperCase();
   if(field==='city'||field==='state'){draft.area=areaForCity(draft.city,draft.state);draft.start=null;}
   // Text fields skip re-rendering (it would steal focus) unless they just completed or reopened a section.
-  if(['name','email','phone','notes','property','access','parking'].includes(field)){const panel=field==='property'?'place':stage===0?'quote':'contact',ready=field==='property'?placeComplete():['name','email','phone'].includes(field)?contactComplete():null,button=document.querySelector(`.section-done[data-id="${panel}"]`);if(button&&ready!==null){button.disabled=!ready;}const done=field==='property'?sectionComplete('place'):['name','email','phone'].includes(field)?sectionComplete(panel):null;if(done===null||done===sectionDone[panel])return;}
-  if(['area','haul','stories'].includes(field))draft.start=null;
+  if(['name','email','phone','notes','property','access','parking'].includes(field)){const panel=field==='property'?'place':stage===0?'quote':'contact',done=field==='property'?sectionComplete('place'):['name','email','phone'].includes(field)?sectionComplete(panel):null;if(done===null||done===sectionDone[panel])return;}
+  if(['area','haul'].includes(field))draft.start=null;
   error='';render();
 });
 document.addEventListener('keydown', event => {
